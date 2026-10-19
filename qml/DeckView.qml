@@ -171,16 +171,26 @@ Panel {
                 checked: root.deck.loopEnabled
                 onToggled: v => root.deck.loopEnabled = v
             }
+            ParamButton {
+                // armed: loop the intro; release to play on into the main loop
+                text: "Intro"
+                checkable: true
+                checked: root.deck.introArmed
+                enabled: root.deck.loaded
+                onToggled: v => root.deck.introArmed = v
+            }
             ParamChoice {
                 Layout.preferredWidth: implicitWidth
                 Layout.alignment: Qt.AlignVCenter
                 implicitWidth: 6 * Theme.s(34)
                 cellMinWidth: Theme.s(30)
                 model: ["1", "2", "4", "8", "16", "32"]
-                // the loop's actual length (none lit when it's not one of these)
-                currentIndex: model.indexOf(String(root.deck.loopAuto ? root.deck.loopBars
-                                                   : (root.deck.loopEndBeat - root.deck.loopStartBeat) / 4))
-                onActivated: i => root.deck.loopBars = parseInt(model[i])
+                // the length of the loop in use (none lit when it's not one of these)
+                currentIndex: model.indexOf(String((root.deck.activeLoopEndBeat - root.deck.activeLoopStartBeat) / 4))
+                onActivated: i => {
+                    if (root.deck.introActive) root.deck.introBars = parseInt(model[i])
+                    else root.deck.loopBars = parseInt(model[i])
+                }
             }
             Label { text: "bars" }
             ParamButton { text: "Here"; enabled: root.deck.loaded && root.deck.bpm > 0; onClicked: root.deck.loopHere() }
@@ -192,7 +202,7 @@ Panel {
                 onClicked: root.deck.endLoop()
             }
             ParamText {
-                text: "drag the loop under the timeline: ends resize, middle moves, empty lane draws · ⌥ beats"
+                text: "drag the loops under the timeline: ends resize, middle moves, empty lane draws · ⌥ beats"
                 tone: "faint"
                 small: true
                 wrapMode: Text.NoWrap

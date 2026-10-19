@@ -110,6 +110,14 @@ ParamPlate {
                 checked: root.deck.loopEnabled
                 onToggled: v => root.deck.loopEnabled = v
             }
+            ParamButton {
+                // armed: the intro loops; release it to play on
+                text: "Intro"
+                checkable: true
+                checked: root.deck.introArmed
+                enabled: root.deck.loaded
+                onToggled: v => root.deck.introArmed = v
+            }
             Item { Layout.fillWidth: true }
             ParamText {
                 // key (shifted key when shifted) and tempo, at a glance

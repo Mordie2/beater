@@ -18,7 +18,7 @@ struct BeatGrid {
     // of this length. A bar cut short by less than half a beat still counts:
     // encoders trim a few ms off the end, and the missing sliver plays as
     // silence. Without this a track's last bar was often unreachable.
-    double firstLoopBeat(double step = 4.0) const { return std::ceil((beatAtSec(0.0) - 0.5) / step) * step; }
+    double firstLoopBeat(double step = 4.0) const { return std::ceil((beatAtSec(0.0) - 0.5) / step) * step + 0.0; } // + 0.0: no -0
     double lastLoopBeat(double durationSec, double step = 4.0) const
     {
         return std::floor((beatAtSec(durationSec) + 0.5) / step) * step;

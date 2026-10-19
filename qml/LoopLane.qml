@@ -1,10 +1,11 @@
 import QtQuick
 import HighlighterUI
 
-// The loop region as a bar under the timeline, on the same scale.
-//  Drag an end to resize it, the middle to move it, or the empty lane to
-//  draw a new one. Snaps to bars; hold Option for beats. The automatic end
-//  loop shows dimmer until it is edited.
+// The loops as bars under the timeline, on the same scale: the intro at the
+// start and the main loop (the end loop, or a drawn one). The one the deck
+// loops right now is solid, the other dim.
+//  Drag an end to resize a loop, its middle to move it, or the empty lane to
+//  draw a new main loop. Snaps to bars; hold Option for beats.
 Item {
     id: lane
     required property DeckController deck
@@ -23,77 +24,92 @@ Item {
     function firstBeat(fine) { const q = fine ? 1 : 4; return Math.ceil((beatAtX(0) - 0.5) / q) * q }
     function lastBeat(fine) { const q = fine ? 1 : 4; return Math.floor((beatAtX(width) + 0.5) / q) * q }
 
-    // while dragging: the region being edited; NaN = show the deck's
-    property real editA: NaN
-    property real editB: NaN
-    readonly property real a: isNaN(editA) ? deck.loopStartBeat : editA
-    readonly property real b: isNaN(editB) ? deck.loopEndBeat : editB
-    readonly property bool editing: !isNaN(editA)
+    // while dragging: which loop ("intro" / "main") and where it's going
+    property string editKind: ""
+    property real editA: 0
+    property real editB: 0
 
     Rectangle { anchors.fill: parent; color: Theme.well }
 
-    Rectangle {
-        id: region
-        visible: lane.ready && lane.b > lane.a
-        x: lane.xAtBeat(lane.a)
-        width: Math.max(Theme.s(2), lane.xAtBeat(lane.b) - x)
+    component Region: Rectangle {
+        id: r
+        property bool intro: false
+        readonly property bool editing: lane.editKind === (intro ? "intro" : "main")
+        readonly property real a: editing ? lane.editA : intro ? lane.deck.introStartBeat : lane.deck.loopStartBeat
+        readonly property real b: editing ? lane.editB : intro ? lane.deck.introEndBeat : lane.deck.loopEndBeat
+        readonly property bool active: intro === lane.deck.introActive
+        readonly property bool auto: intro ? lane.deck.introAuto : lane.deck.loopAuto
+
+        visible: lane.ready && b > a
+        x: lane.xAtBeat(a)
+        width: Math.max(Theme.s(2), lane.xAtBeat(b) - x)
         height: parent.height
-        color: lane.deck.loopEnabled || lane.editing ? lane.tint : Theme.line
-        opacity: lane.deck.loopAuto && !lane.editing ? 0.55 : 1
+        z: active || editing ? 1 : 0
+        color: (lane.deck.loopEnabled && active) || editing ? lane.tint : Theme.line
+        opacity: editing ? 1 : active ? (auto ? 0.8 : 1) : 0.35
         // the ends you can grab
-        Rectangle { width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(region.color) }
-        Rectangle { x: parent.width - width; width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(region.color) }
+        Rectangle { width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(r.color) }
+        Rectangle { x: parent.width - width; width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(r.color) }
         Text {
             anchors.centerIn: parent
             visible: implicitWidth < parent.width - 2 * lane.handle - Theme.s(4)
-            readonly property real beats: lane.b - lane.a
-            text: (beats % 4 === 0 ? beats / 4 + (beats === 4 ? " bar" : " bars") : beats + " beats")
-                  + (lane.deck.loopAuto && !lane.editing ? " · end" : "")
-            color: Theme.inkOf(region.color)
+            readonly property real beats: r.b - r.a
+            readonly property string len: beats % 4 === 0 ? beats / 4 + (beats === 4 ? " bar" : " bars") : beats + " beats"
+            text: r.intro ? "intro · " + len : len + (r.auto && !r.editing ? " · end" : "")
+            color: Theme.inkOf(r.color)
             font.family: Theme.family
             font.pixelSize: Theme.smallSize
             font.weight: Font.Bold
         }
     }
 
+    Region { id: introRegion; intro: true }
+    Region { id: mainRegion; intro: false }
+
     MouseArea {
         id: ma
         anchors.fill: parent
+        z: 2
         enabled: lane.ready
         hoverEnabled: true
         preventStealing: true
-        property string mode: ""     // "start", "end", "move", "draw"
+        property string part: ""     // "start", "end", "move", "draw"
         property real pressBeat: 0
         property real fromA: 0
         property real fromB: 0
 
-        function zoneAt(x) {
-            if (!region.visible) return "draw"
-            const x0 = region.x, x1 = region.x + region.width
-            if (Math.abs(x - x0) <= lane.handle && x < x1 - 1) return "start"
-            if (Math.abs(x - x1) <= lane.handle) return "end"
-            if (x > x0 && x < x1) return "move"
-            return "draw"
+        // What's under x: the loop on top (the active one) first.
+        function hit(x) {
+            const order = lane.deck.introActive ? [introRegion, mainRegion] : [mainRegion, introRegion]
+            for (const r of order) {
+                if (!r.visible) continue
+                const x0 = r.x, x1 = r.x + r.width
+                const kind = r.intro ? "intro" : "main"
+                if (Math.abs(x - x0) <= lane.handle && x < x1 - 1) return { kind: kind, part: "start", r: r }
+                if (Math.abs(x - x1) <= lane.handle) return { kind: kind, part: "end", r: r }
+                if (x > x0 && x < x1) return { kind: kind, part: "move", r: r }
+            }
+            return { kind: "main", part: "draw", r: null }
         }
         cursorShape: {
-            const z = pressed ? mode : zoneAt(mouseX)
-            return z === "start" || z === "end" ? Qt.SizeHorCursor
-                 : z === "move" ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
+            const p = pressed ? part : hit(mouseX).part
+            return p === "start" || p === "end" ? Qt.SizeHorCursor
+                 : p === "move" ? (pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor)
                  : Qt.CrossCursor
         }
         onPressed: m => {
-            mode = zoneAt(m.x)
+            const h = hit(m.x)
+            part = h.part
             pressBeat = lane.beatAtX(m.x)
-            fromA = lane.a
-            fromB = lane.b
-            if (mode === "draw") {
-                const s = lane.snap(pressBeat, m.modifiers & Qt.AltModifier)
-                lane.editA = s
-                lane.editB = s
+            if (h.r) {
+                fromA = h.r.a
+                fromB = h.r.b
             } else {
-                lane.editA = fromA
-                lane.editB = fromB
+                fromA = fromB = lane.snap(pressBeat, m.modifiers & Qt.AltModifier)
             }
+            lane.editA = fromA
+            lane.editB = fromB
+            lane.editKind = h.kind
         }
         onPositionChanged: m => {
             if (!pressed) return
@@ -101,29 +117,31 @@ Item {
             const min = fine ? 1 : 4
             const lo = lane.firstBeat(fine), hi = lane.lastBeat(fine)
             const beat = Math.max(lo, Math.min(hi, lane.snap(lane.beatAtX(m.x), fine)))
-            if (mode === "start") {
+            if (part === "start") {
                 lane.editA = Math.min(beat, fromB - min)
-            } else if (mode === "end") {
+            } else if (part === "end") {
                 lane.editB = Math.max(beat, fromA + min)
-            } else if (mode === "move") {
+            } else if (part === "move") {
                 const len = fromB - fromA
                 const d = lane.snap(lane.beatAtX(m.x) - pressBeat, fine)
                 const s = Math.max(lo, Math.min(hi - len, fromA + d))
                 lane.editA = s
                 lane.editB = s + len
             } else {
-                const s = lane.snap(pressBeat, fine)
-                lane.editA = Math.min(s, beat)
-                lane.editB = Math.max(s, beat)
+                lane.editA = Math.min(fromA, beat)
+                lane.editB = Math.max(fromA, beat)
             }
         }
         onReleased: {
-            if (lane.editB - lane.editA >= 1 && (lane.editA !== fromA || lane.editB !== fromB))
-                lane.deck.setLoopBeats(lane.editA, lane.editB)
-            lane.editA = NaN
-            lane.editB = NaN
-            mode = ""
+            if (lane.editB - lane.editA >= 1 && (lane.editA !== fromA || lane.editB !== fromB)) {
+                if (lane.editKind === "intro")
+                    lane.deck.setIntroBeats(lane.editA, lane.editB)
+                else
+                    lane.deck.setLoopBeats(lane.editA, lane.editB)
+            }
+            lane.editKind = ""
+            part = ""
         }
-        onCanceled: { lane.editA = NaN; lane.editB = NaN; mode = "" }
+        onCanceled: { lane.editKind = ""; part = "" }
     }
 }

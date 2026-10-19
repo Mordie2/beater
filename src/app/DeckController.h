@@ -50,6 +50,18 @@ class DeckController : public QObject {
     Q_PROPERTY(bool loopAuto READ loopAuto NOTIFY loopChanged)
     Q_PROPERTY(int loopBars READ loopBars WRITE setLoopBars NOTIFY loopBarsChanged)
     Q_PROPERTY(bool inLoop READ inLoop NOTIFY positionChanged)
+    // The intro loop: while armed, the deck loops the intro (the first N bars,
+    // or a drawn one) instead of its main loop. Armed on every load; release it
+    // to play on. It releases itself once the playhead is past it.
+    Q_PROPERTY(bool introArmed READ introArmed WRITE setIntroArmed NOTIFY loopChanged)
+    Q_PROPERTY(bool introActive READ introActive NOTIFY loopChanged)
+    Q_PROPERTY(double introStartBeat READ introStartBeat NOTIFY loopChanged)
+    Q_PROPERTY(double introEndBeat READ introEndBeat NOTIFY loopChanged)
+    Q_PROPERTY(bool introAuto READ introAuto NOTIFY loopChanged)
+    Q_PROPERTY(int introBars READ introBars WRITE setIntroBars NOTIFY loopBarsChanged)
+    // The region the engine loops right now (the intro or the main loop).
+    Q_PROPERTY(double activeLoopStartBeat READ activeLoopStartBeat NOTIFY loopChanged)
+    Q_PROPERTY(double activeLoopEndBeat READ activeLoopEndBeat NOTIFY loopChanged)
 
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(int waveformRevision READ waveformRevision NOTIFY trackChanged)
@@ -94,6 +106,16 @@ public:
     int loopBars() const { return m_loopBars; }
     void setLoopBars(int bars);
     bool inLoop() const;
+    bool introArmed() const { return m_introArmed; }
+    void setIntroArmed(bool on);
+    bool introActive() const { return m_introArmed && m_introEnd > m_introStart; }
+    double introStartBeat() const { return m_introStart; }
+    double introEndBeat() const { return m_introEnd; }
+    bool introAuto() const { return !m_rec.hasManualIntro(); }
+    int introBars() const { return m_introBars; }
+    void setIntroBars(int bars);
+    double activeLoopStartBeat() const { return introActive() ? m_introStart : m_loopStart; }
+    double activeLoopEndBeat() const { return introActive() ? m_introEnd : m_loopEnd; }
 
     double volume() const { return m_volume; }
     void setVolume(double v);
@@ -136,6 +158,8 @@ public:
     Q_INVOKABLE void setLoopBeats(double startBeat, double endBeat);
     Q_INVOKABLE void loopHere();
     Q_INVOKABLE void endLoop(); // back to automatic last-N-bars loop
+    Q_INVOKABLE void setIntroBeats(double startBeat, double endBeat);
+    Q_INVOKABLE void autoIntro(); // back to the automatic first-N-bars intro
 
     void loadRecord(const TrackRecord &rec);
     void poll(); // called by AppController at display rate
@@ -188,10 +212,14 @@ private:
     bool m_loopEnabled = true;
     int m_loopBars = 8;
     double m_loopStart = 0.0, m_loopEnd = 0.0;
+    bool m_introArmed = true;
+    int m_introBars = 8;
+    double m_introStart = 0.0, m_introEnd = 0.0;
     double m_volume = 0.8;
 
     double m_preview = -1.0;     // < 0: not dragging
     QElapsedTimer m_previewHold; // after commit, until the seek lands
+    QElapsedTimer m_loadedAt;
 
     QList<qint64> m_taps;
     QElapsedTimer m_tapClock;

@@ -300,8 +300,20 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
             for (double b = first; g.secAtBeat(b) < dur; b += 32.0)
                 node->over->add(QRectF(std::round(xAt(g.secAtBeat(b))), 0, 1, h), QColor(255, 255, 255, 28));
         }
-        // loop region (or the one being drawn with Shift)
-        double la = m_deck->loopStartBeat(), lb = m_deck->loopEndBeat();
+        // the loop not in use right now (intro or main), faint
+        if (g.valid()) {
+            const bool intro = m_deck->introActive();
+            const double ia = intro ? m_deck->loopStartBeat() : m_deck->introStartBeat();
+            const double ib = intro ? m_deck->loopEndBeat() : m_deck->introEndBeat();
+            if (ib > ia) {
+                const double x0 = xAt(g.secAtBeat(ia)), x1 = xAt(g.secAtBeat(ib));
+                node->over->add(QRectF(x0, 0, x1 - x0, h), QColor(255, 255, 255, 8));
+                node->over->add(QRectF(x0, 0, 1, h), QColor(255, 255, 255, 45));
+                node->over->add(QRectF(x1 - 1, 0, 1, h), QColor(255, 255, 255, 45));
+            }
+        }
+        // the loop in use (or the one being drawn with Shift)
+        double la = m_deck->activeLoopStartBeat(), lb = m_deck->activeLoopEndBeat();
         if (m_dragging) {
             la = std::min(m_dragA, m_dragB);
             lb = std::max(m_dragA, m_dragB);
@@ -335,8 +347,8 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
             node->key = key;
         }
 
-        // loop region underneath
-        const double la = m_deck->loopStartBeat(), lb = m_deck->loopEndBeat();
+        // the loop in use, underneath
+        const double la = m_deck->activeLoopStartBeat(), lb = m_deck->activeLoopEndBeat();
         if (g.valid() && lb > la) {
             const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
             node->under->add(QRectF(x0, 0, x1 - x0, h), QColor(255, 255, 255, m_deck->loopEnabled() ? 22 : 8));

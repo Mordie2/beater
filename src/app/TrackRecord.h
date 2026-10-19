@@ -27,6 +27,9 @@ struct TrackRecord {
     // Loop region in beats. end <= start = automatic end loop.
     double loopStartBeat = 0.0;
     double loopEndBeat = 0.0;
+    // Intro loop in beats. end <= start = automatic (the first N bars).
+    double introStartBeat = 0.0;
+    double introEndBeat = 0.0;
 
     bool analyzed = false;
     int analysisVersion = 0;
@@ -34,6 +37,7 @@ struct TrackRecord {
 
     BeatGrid grid() const { return BeatGrid{bpm, firstBeatSec}; }
     bool hasManualLoop() const { return loopEndBeat > loopStartBeat; }
+    bool hasManualIntro() const { return introEndBeat > introStartBeat; }
     bool needsAnalysis() const { return !analyzed || analysisVersion < kAnalysisVersion; }
 
     QJsonObject toJson() const
@@ -51,6 +55,8 @@ struct TrackRecord {
         o["keyConfidence"] = keyConfidence;
         o["loopStart"] = loopStartBeat;
         o["loopEnd"] = loopEndBeat;
+        o["introStart"] = introStartBeat;
+        o["introEnd"] = introEndBeat;
         o["analyzed"] = analyzed;
         o["analysisVersion"] = analysisVersion;
         return o;
@@ -72,6 +78,8 @@ struct TrackRecord {
         r.keyConfidence = o["keyConfidence"].toDouble();
         r.loopStartBeat = o["loopStart"].toDouble();
         r.loopEndBeat = o["loopEnd"].toDouble();
+        r.introStartBeat = o["introStart"].toDouble();
+        r.introEndBeat = o["introEnd"].toDouble();
         r.analyzed = o["analyzed"].toBool();
         r.analysisVersion = o["analysisVersion"].toInt();
         return r;
