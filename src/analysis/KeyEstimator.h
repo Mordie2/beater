@@ -4,7 +4,8 @@
 
 // Built-in key estimator: a whole-track chromagram (spectral peaks folded onto
 // pitch classes, A = 440 Hz) correlated with the 24 rotated Temperley
-// (Kostka-Payne) key profiles.
+// (Kostka-Payne) key profiles, plus a bonus for the bass's root and a
+// preference for minor (most of this music is minor).
 //
 // Stage-1 stopgap. Stage 2 runs libkeyfinder and Essentia Key (edma / bgate)
 // and keeps whichever agrees with manual corrections; the result shape stays.

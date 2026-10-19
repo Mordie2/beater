@@ -16,6 +16,13 @@ constexpr int kHop = 4096;
 constexpr double kMinMidi = 40.0;
 constexpr double kMaxMidi = 96.0;
 
+// In this music the bass names the key, and most tracks are minor: on 85 of
+// my edits labelled with their key (all but one minor), these two raised exact
+// hits from 46 to 58 (fifths are most of what's left).
+constexpr double kBassTonic = 0.45; // * the bass's share of the tonic (vs its strongest note)
+constexpr double kMinorBias = 0.15; // added to every minor key's score
+constexpr double kBassTopMidi = 52.5; // the bass: E2 .. E3
+
 // Temperley's Kostka-Payne key profiles, tonic first. Krumhansl-Kessler
 // confused major keys with their mediant minor (Eb -> Gm) on harmonic-rich pads.
 constexpr std::array<double, 12> kMajor = {0.748, 0.060, 0.488, 0.082, 0.670, 0.460, 0.096, 0.715, 0.104, 0.366, 0.057, 0.400};
@@ -68,13 +75,16 @@ KeyResult estimateKey(const std::vector<float> &x, uint32_t sr)
     for (int i = 0; i < kFft; ++i)
         win[size_t(i)] = 0.5f - 0.5f * std::cos(2.0f * float(M_PI) * float(i) / float(kFft));
 
-    std::array<double, 12> chroma{};
+    std::array<double, 12> chroma{}, bass{};
+    std::vector<bool> binBass(size_t(bins), false);
+    for (int b = 1; b < bins; ++b)
+        binBass[size_t(b)] = 69.0 + 12.0 * std::log2(double(b) * sr / kFft / 440.0) < kBassTopMidi;
     std::vector<std::complex<float>> buf(kFft);
     std::vector<float> mag(static_cast<size_t>(bins));
     const size_t frames = (x.size() - kFft) / kHop + 1;
     // Frames quieter than this (relative to the loudest) are breaks or silence.
     std::vector<double> frameEnergy(frames, 0.0);
-    std::vector<std::array<double, 12>> frameChroma(frames);
+    std::vector<std::array<double, 12>> frameChroma(frames), frameBass(frames);
     double loudest = 0.0;
     for (size_t t = 0; t < frames; ++t) {
         const size_t off = t * kHop;
@@ -83,7 +93,7 @@ KeyResult estimateKey(const std::vector<float> &x, uint32_t sr)
         fftInPlace(buf);
         for (int b = 0; b < bins; ++b)
             mag[size_t(b)] = std::abs(buf[size_t(b)]);
-        std::array<double, 12> c{};
+        std::array<double, 12> c{}, cb{};
         double e = 0.0;
         // Spectral peaks only: tones, not the broadband noise of drums.
         for (int b = 2; b < bins - 1; ++b) {
@@ -95,10 +105,13 @@ KeyResult estimateKey(const std::vector<float> &x, uint32_t sr)
             // sqrt: softer than linear, but keeps upper partials below the fundamentals
             const double v = std::sqrt(double(m)) * binW[size_t(b)];
             c[size_t(binPc[size_t(b)])] += v;
+            if (binBass[size_t(b)])
+                cb[size_t(binPc[size_t(b)])] += v;
             e += v;
         }
         frameEnergy[t] = e;
         frameChroma[t] = c;
+        frameBass[t] = cb;
         loudest = std::max(loudest, e);
     }
     if (loudest <= 0.0)
@@ -107,14 +120,21 @@ KeyResult estimateKey(const std::vector<float> &x, uint32_t sr)
     for (size_t t = 0; t < frames; ++t) {
         if (frameEnergy[t] < 0.2 * loudest)
             continue;
-        for (int i = 0; i < 12; ++i)
+        for (int i = 0; i < 12; ++i) {
             chroma[size_t(i)] += frameChroma[t][size_t(i)] / frameEnergy[t];
+            bass[size_t(i)] += frameBass[t][size_t(i)] / frameEnergy[t];
+        }
     }
 
+    const double bassTop = *std::max_element(bass.begin(), bass.end());
     double best = -2.0, second = -2.0;
     int bestKey = -1;
     for (int k = 0; k < 24; ++k) {
-        const double r = correlate(chroma, k < 12 ? kMajor : kMinor, k % 12);
+        double r = correlate(chroma, k < 12 ? kMajor : kMinor, k % 12);
+        if (k >= 12)
+            r += kMinorBias;
+        if (bassTop > 0.0)
+            r += kBassTonic * bass[size_t(k % 12)] / bassTop;
         if (r > best) {
             second = best;
             best = r;
