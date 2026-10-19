@@ -1,11 +1,12 @@
 import QtQuick
 import HighlighterUI
 
-// The loops as bars under the timeline, on the same scale: the intro at the
-// start and the main loop (the end loop, or a drawn one). The one the deck
-// loops right now is solid, the other dim.
+// The track's loops as bars under the timeline, on the same scale: the intro,
+// the In / Out loop and the end loop. The one the deck loops right now is
+// solid, one that's armed is half lit, one that's off is dim.
 //  Drag an end to resize a loop, its middle to move it, or the empty lane to
-//  draw a new main loop. Snaps to bars; hold Option for beats.
+//  draw an In / Out loop. Double-click a loop to reset it (the intro and end
+//  back to automatic, the In / Out loop gone). Snaps to bars; Option for beats.
 Item {
     id: lane
     required property DeckController deck
@@ -25,7 +26,7 @@ Item {
     function firstBeat(fine) { const q = fine ? 1 : 4; return Math.ceil((beatAtX(0) - 0.5) / q) * q }
     function lastBeat(fine) { const q = fine ? 1 : 4; return Math.floor((beatAtX(width) + 0.5) / q) * q }
 
-    // while dragging: which loop ("intro" / "main") and where it's going
+    // while dragging: which loop and where it's going
     property string editKind: ""
     property real editA: 0
     property real editB: 0
@@ -34,20 +35,26 @@ Item {
 
     component Region: Rectangle {
         id: r
-        property bool intro: false
-        readonly property bool editing: lane.editKind === (intro ? "intro" : "main")
-        readonly property real a: editing ? lane.editA : intro ? lane.deck.introStartBeat : lane.deck.loopStartBeat
-        readonly property real b: editing ? lane.editB : intro ? lane.deck.introEndBeat : lane.deck.loopEndBeat
-        readonly property bool active: intro === lane.deck.introActive
-        readonly property bool auto: intro ? lane.deck.introAuto : lane.deck.loopAuto
+        required property string kind   // "intro", "custom", "end"
+        readonly property bool editing: lane.editKind === kind
+        readonly property real a: editing ? lane.editA
+                                : kind === "intro" ? lane.deck.introStartBeat
+                                : kind === "custom" ? lane.deck.customStartBeat : lane.deck.endStartBeat
+        readonly property real b: editing ? lane.editB
+                                : kind === "intro" ? lane.deck.introEndBeat
+                                : kind === "custom" ? lane.deck.customEndBeat : lane.deck.endEndBeat
+        readonly property bool active: lane.deck.activeLoop === kind
+        readonly property bool armed: kind === "intro" ? lane.deck.introArmed
+                                    : kind === "custom" ? lane.deck.customOn : lane.deck.endArmed
+        readonly property bool auto: kind === "intro" ? lane.deck.introAuto : kind === "end" ? lane.deck.endAuto : false
 
         visible: lane.ready && b > a
         x: lane.xAtBeat(a)
         width: Math.max(Theme.s(2), lane.xAtBeat(b) - x)
         height: parent.height
-        z: active || editing ? 1 : 0
-        color: (lane.deck.loopEnabled && active) || editing ? lane.tint : Theme.line
-        opacity: editing ? 1 : active ? (auto ? 0.8 : 1) : 0.35
+        z: active || editing ? 2 : kind === "custom" ? 1 : 0
+        color: lane.tint
+        opacity: editing || active ? 1 : armed ? 0.55 : 0.22
         // the ends you can grab
         Rectangle { width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(r.color) }
         Rectangle { x: parent.width - width; width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(r.color) }
@@ -56,7 +63,7 @@ Item {
             visible: implicitWidth < parent.width - 2 * lane.handle - Theme.s(4)
             readonly property real beats: r.b - r.a
             readonly property string len: beats % 4 === 0 ? beats / 4 + (beats === 4 ? " bar" : " bars") : beats + " beats"
-            text: r.intro ? "intro · " + len : len + (r.auto && !r.editing ? " · end" : "")
+            text: r.kind === "intro" ? "intro · " + len : r.kind === "end" ? "end · " + len : "in/out · " + len
             color: Theme.inkOf(r.color)
             font.family: Theme.family
             font.pixelSize: Theme.smallSize
@@ -64,13 +71,24 @@ Item {
         }
     }
 
-    Region { id: introRegion; intro: true }
-    Region { id: mainRegion; intro: false }
+    Region { id: introRegion; kind: "intro" }
+    Region { id: customRegion; kind: "custom" }
+    Region { id: endRegion; kind: "end" }
+
+    // an In placed, waiting for its Out
+    Rectangle {
+        visible: lane.ready && lane.deck.customPending
+        x: lane.xAtBeat(lane.deck.customStartBeat) - width / 2
+        width: Theme.s(3)
+        height: parent.height
+        color: lane.tint
+        z: 3
+    }
 
     MouseArea {
         id: ma
         anchors.fill: parent
-        z: 2
+        z: 4
         enabled: lane.ready
         hoverEnabled: true
         preventStealing: true
@@ -79,18 +97,18 @@ Item {
         property real fromA: 0
         property real fromB: 0
 
-        // What's under x: the loop on top (the active one) first.
+        // What's under x: the loop in use first, then the In / Out loop, the intro, the end.
         function hit(x) {
-            const order = lane.deck.introActive ? [introRegion, mainRegion] : [mainRegion, introRegion]
+            const all = [introRegion, customRegion, endRegion]
+            const order = all.filter(r => r.active).concat([customRegion, introRegion, endRegion].filter(r => !r.active))
             for (const r of order) {
                 if (!r.visible) continue
                 const x0 = r.x, x1 = r.x + r.width
-                const kind = r.intro ? "intro" : "main"
-                if (Math.abs(x - x0) <= lane.handle && x < x1 - 1) return { kind: kind, part: "start", r: r }
-                if (Math.abs(x - x1) <= lane.handle) return { kind: kind, part: "end", r: r }
-                if (x > x0 && x < x1) return { kind: kind, part: "move", r: r }
+                if (Math.abs(x - x0) <= lane.handle && x < x1 - 1) return { kind: r.kind, part: "start", r: r }
+                if (Math.abs(x - x1) <= lane.handle) return { kind: r.kind, part: "end", r: r }
+                if (x > x0 && x < x1) return { kind: r.kind, part: "move", r: r }
             }
-            return { kind: "main", part: "draw", r: null }
+            return { kind: "custom", part: "draw", r: null }
         }
         cursorShape: {
             const p = pressed ? part : hit(mouseX).part
@@ -137,12 +155,21 @@ Item {
             if (lane.editB - lane.editA >= 1 && (lane.editA !== fromA || lane.editB !== fromB)) {
                 if (lane.editKind === "intro")
                     lane.deck.setIntroBeats(lane.editA, lane.editB)
+                else if (lane.editKind === "end")
+                    lane.deck.setEndBeats(lane.editA, lane.editB)
                 else
-                    lane.deck.setLoopBeats(lane.editA, lane.editB)
+                    lane.deck.setCustomBeats(lane.editA, lane.editB)
             }
             lane.editKind = ""
             part = ""
         }
         onCanceled: { lane.editKind = ""; part = "" }
+        onDoubleClicked: m => {
+            const h = hit(m.x)
+            if (!h.r) return
+            if (h.kind === "intro") lane.deck.autoIntro()
+            else if (h.kind === "end") lane.deck.autoEnd()
+            else lane.deck.clearCustom()
+        }
     }
 }

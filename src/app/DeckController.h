@@ -44,25 +44,36 @@ class DeckController : public QObject {
     Q_PROPERTY(QStringList keyNames READ keyNames NOTIFY keyChanged) // 24 entries, index = key
 
     Q_PROPERTY(bool sync READ sync WRITE setSync NOTIFY syncChanged)
-    Q_PROPERTY(bool loopEnabled READ loopEnabled WRITE setLoopEnabled NOTIFY loopChanged)
-    Q_PROPERTY(double loopStartBeat READ loopStartBeat NOTIFY loopChanged)
-    Q_PROPERTY(double loopEndBeat READ loopEndBeat NOTIFY loopChanged)
-    Q_PROPERTY(bool loopAuto READ loopAuto NOTIFY loopChanged)
-    Q_PROPERTY(int loopBars READ loopBars WRITE setLoopBars NOTIFY loopBarsChanged)
+    // ---- loops. Three per track; the engine loops one at a time:
+    //  intro   the first N bars (or drawn). Armed on every load, so play loops
+    //          it until it's released.
+    //  custom  In / Out markers anywhere (or drawn). Out starts it.
+    //  end     the last N bars (or drawn). Armed by default, so a track that
+    //          runs out keeps looping its ending.
+    // In use: the custom loop if on, else the intro if armed, else the end.
+    // Switching the intro or the custom loop on with the playhead past it
+    // jumps back in (in phase when playing); one the playhead has left behind
+    // releases itself, so the end loop still catches the track.
+    Q_PROPERTY(QString activeLoop READ activeLoop NOTIFY loopChanged) // "intro", "custom", "end" or ""
+    Q_PROPERTY(double activeLoopStartBeat READ activeLoopStartBeat NOTIFY loopChanged)
+    Q_PROPERTY(double activeLoopEndBeat READ activeLoopEndBeat NOTIFY loopChanged)
     Q_PROPERTY(bool inLoop READ inLoop NOTIFY positionChanged)
-    // The intro loop: while armed, the deck loops the intro (the first N bars,
-    // or a drawn one) instead of its main loop. Armed on every load; release it
-    // to play on. It releases itself once the playhead is past it; arming it
-    // with the playhead past it jumps back in (in phase when playing).
+
     Q_PROPERTY(bool introArmed READ introArmed WRITE setIntroArmed NOTIFY loopChanged)
-    Q_PROPERTY(bool introActive READ introActive NOTIFY loopChanged)
     Q_PROPERTY(double introStartBeat READ introStartBeat NOTIFY loopChanged)
     Q_PROPERTY(double introEndBeat READ introEndBeat NOTIFY loopChanged)
     Q_PROPERTY(bool introAuto READ introAuto NOTIFY loopChanged)
-    Q_PROPERTY(int introBars READ introBars WRITE setIntroBars NOTIFY loopBarsChanged)
-    // The region the engine loops right now (the intro or the main loop).
-    Q_PROPERTY(double activeLoopStartBeat READ activeLoopStartBeat NOTIFY loopChanged)
-    Q_PROPERTY(double activeLoopEndBeat READ activeLoopEndBeat NOTIFY loopChanged)
+
+    Q_PROPERTY(bool customOn READ customOn WRITE setCustomOn NOTIFY loopChanged)
+    Q_PROPERTY(bool hasCustom READ hasCustom NOTIFY loopChanged)        // both markers placed
+    Q_PROPERTY(bool customPending READ customPending NOTIFY loopChanged) // In placed, waiting for Out
+    Q_PROPERTY(double customStartBeat READ customStartBeat NOTIFY loopChanged)
+    Q_PROPERTY(double customEndBeat READ customEndBeat NOTIFY loopChanged)
+
+    Q_PROPERTY(bool endArmed READ endArmed WRITE setEndArmed NOTIFY loopChanged)
+    Q_PROPERTY(double endStartBeat READ endStartBeat NOTIFY loopChanged)
+    Q_PROPERTY(double endEndBeat READ endEndBeat NOTIFY loopChanged)
+    Q_PROPERTY(bool endAuto READ endAuto NOTIFY loopChanged)
 
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY volumeChanged)
     Q_PROPERTY(int waveformRevision READ waveformRevision NOTIFY trackChanged)
@@ -99,24 +110,29 @@ public:
 
     bool sync() const { return m_sync; }
     void setSync(bool on);
-    bool loopEnabled() const { return m_loopEnabled; }
-    void setLoopEnabled(bool on);
-    double loopStartBeat() const { return m_loopStart; }
-    double loopEndBeat() const { return m_loopEnd; }
-    bool loopAuto() const { return !m_rec.hasManualLoop(); }
-    int loopBars() const { return m_loopBars; }
-    void setLoopBars(int bars);
+    QString activeLoop() const;
+    double activeLoopStartBeat() const;
+    double activeLoopEndBeat() const;
     bool inLoop() const;
+
     bool introArmed() const { return m_introArmed; }
     void setIntroArmed(bool on);
-    bool introActive() const { return m_introArmed && m_introEnd > m_introStart; }
     double introStartBeat() const { return m_introStart; }
     double introEndBeat() const { return m_introEnd; }
     bool introAuto() const { return !m_rec.hasManualIntro(); }
-    int introBars() const { return m_introBars; }
-    void setIntroBars(int bars);
-    double activeLoopStartBeat() const { return introActive() ? m_introStart : m_loopStart; }
-    double activeLoopEndBeat() const { return introActive() ? m_introEnd : m_loopEnd; }
+
+    bool customOn() const { return m_customOn; }
+    void setCustomOn(bool on);
+    bool hasCustom() const { return m_customEnd > m_customStart; }
+    bool customPending() const { return m_customPending; }
+    double customStartBeat() const { return m_customStart; }
+    double customEndBeat() const { return m_customEnd; }
+
+    bool endArmed() const { return m_endArmed; }
+    void setEndArmed(bool on);
+    double endStartBeat() const { return m_endStart; }
+    double endEndBeat() const { return m_endEnd; }
+    bool endAuto() const { return !m_rec.hasManualLoop(); }
 
     double volume() const { return m_volume; }
     void setVolume(double v);
@@ -156,11 +172,16 @@ public:
     QStringList keyNames() const;
 
     // loops (beats on the track grid)
-    Q_INVOKABLE void setLoopBeats(double startBeat, double endBeat);
-    Q_INVOKABLE void loopHere();
-    Q_INVOKABLE void endLoop(); // back to automatic last-N-bars loop
+    Q_INVOKABLE void loopIn();   // In marker at the playhead (nearest beat)
+    Q_INVOKABLE void loopOut();  // Out marker at the playhead: the In / Out loop starts
+    Q_INVOKABLE void loopHere(); // an In / Out loop of the last chosen length from this bar
+    Q_INVOKABLE void setLoopLength(int bars); // the loop in use (or the next Here)
     Q_INVOKABLE void setIntroBeats(double startBeat, double endBeat);
     Q_INVOKABLE void autoIntro(); // back to the automatic first-N-bars intro
+    Q_INVOKABLE void setCustomBeats(double startBeat, double endBeat);
+    Q_INVOKABLE void clearCustom();
+    Q_INVOKABLE void setEndBeats(double startBeat, double endBeat);
+    Q_INVOKABLE void autoEnd(); // back to the automatic last-N-bars loop
 
     void loadRecord(const TrackRecord &rec);
     void poll(); // called by AppController at display rate
@@ -180,13 +201,13 @@ signals:
     void keyChanged();
     void syncChanged();
     void loopChanged();
-    void loopBarsChanged();
     void volumeChanged();
 
 private:
     void sendGrid();
     void sendLoop();
     void computeLoop();
+    void jumpInto(double startBeat, double endBeat); // into a loop the playhead is past
     void commitRecord(); // write m_rec to the library
     void updatePlayingBpm();
     double snapToBeat(double sec) const;
@@ -210,18 +231,20 @@ private:
 
     int m_keyShift = 0;
     bool m_sync = true;
-    bool m_loopEnabled = true;
-    int m_loopBars = 8;
-    double m_loopStart = 0.0, m_loopEnd = 0.0;
+    int m_introBars = 8, m_endBars = 8, m_customBars = 4; // auto lengths, Here's length
     bool m_introArmed = true;
-    int m_introBars = 8;
     double m_introStart = 0.0, m_introEnd = 0.0;
+    bool m_customOn = false;
+    bool m_customPending = false; // In placed, no Out yet (start == end)
+    double m_customStart = 0.0, m_customEnd = 0.0;
+    bool m_endArmed = true;
+    double m_endStart = 0.0, m_endEnd = 0.0;
+    QElapsedTimer m_loopSwitchedAt; // the auto-release waits for a jump in to land
     double m_volume = 0.8;
 
     double m_preview = -1.0;     // < 0: not dragging
     QElapsedTimer m_previewHold; // after commit, until the seek lands
     QElapsedTimer m_loadedAt;
-    QElapsedTimer m_introArmedAt; // the auto-release waits for an arm's jump to land
 
     QList<qint64> m_taps;
     QElapsedTimer m_tapClock;

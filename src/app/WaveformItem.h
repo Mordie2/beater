@@ -9,8 +9,8 @@ class DeckController;
 // Waveform with beat grid, loop region and playhead.
 //  Overview mode: whole track. Click or drag = move the playhead: it follows
 //  the pointer and the deck jumps there on release (on the beat, or into
-//  phase with the master when synced and playing). Shift-drag = set the loop
-//  region, snapped to bars (add Alt/Option to snap to beats).
+//  phase with the master when synced and playing). Shift-drag = draw an In / Out loop,
+//  snapped to bars (add Alt/Option to snap to beats).
 //  Zoom mode: a window of N beats scrolling around the playhead. Drag it to
 //  move through the track the same way; the waveform follows the hand.
 //

@@ -174,27 +174,51 @@ Panel {
             }
         }
 
-        // ---- loops (yellow) ----
+        // ---- loops (amber): intro · in / out · end ----
         RowLayout {
             spacing: Theme.s(4)
             RowLayout {
                 property color accent: Look.loop
                 spacing: Theme.s(4)
-                Label { text: "loop"; color: Look.label(Look.loop); Layout.rightMargin: Theme.s(4) }
+                Label { text: "loops"; color: Look.label(Look.loop); Layout.rightMargin: Theme.s(4) }
                 ParamButton {
-                    text: "On"
-                    checkable: true
-                    checked: root.deck.loopEnabled
-                    onToggled: v => root.deck.loopEnabled = v
-                }
-                ParamButton {
-                    // armed: loop the intro; release to play on into the main loop
+                    // armed: the intro loops; release it to play on
                     text: "Intro"
                     checkable: true
                     checked: root.deck.introArmed
                     enabled: root.deck.loaded
                     onToggled: v => root.deck.introArmed = v
                 }
+                Gap {}
+                ParamButton {
+                    text: "In"
+                    checked: root.deck.customPending   // lit while it waits for an Out
+                    enabled: root.deck.loaded && root.deck.bpm > 0
+                    onClicked: root.deck.loopIn()
+                }
+                ParamButton {
+                    text: "Out"
+                    enabled: root.deck.customPending || root.deck.hasCustom
+                    onClicked: root.deck.loopOut()
+                }
+                ParamButton {
+                    // the In / Out loop on / off (back on past it jumps back in)
+                    text: "Loop"
+                    checkable: true
+                    checked: root.deck.customOn
+                    enabled: root.deck.hasCustom
+                    onToggled: v => root.deck.customOn = v
+                }
+                Gap {}
+                ParamButton {
+                    // armed: a track that runs out loops its ending
+                    text: "End"
+                    checkable: true
+                    checked: root.deck.endArmed
+                    enabled: root.deck.loaded
+                    onToggled: v => root.deck.endArmed = v
+                }
+                Gap {}
                 ParamChoice {
                     Layout.preferredWidth: implicitWidth
                     Layout.alignment: Qt.AlignVCenter
@@ -203,23 +227,13 @@ Panel {
                     model: ["1", "2", "4", "8", "16", "32"]
                     // the length of the loop in use (none lit when it's not one of these)
                     currentIndex: model.indexOf(String((root.deck.activeLoopEndBeat - root.deck.activeLoopStartBeat) / 4))
-                    onActivated: i => {
-                        if (root.deck.introActive) root.deck.introBars = parseInt(model[i])
-                        else root.deck.loopBars = parseInt(model[i])
-                    }
+                    onActivated: i => root.deck.setLoopLength(parseInt(model[i]))
                 }
                 Label { text: "bars"; color: Look.label(Look.loop) }
                 ParamButton { text: "Here"; enabled: root.deck.loaded && root.deck.bpm > 0; onClicked: root.deck.loopHere() }
-                ParamButton {
-                    // not checkable: End goes back to the automatic end loop, it doesn't switch off
-                    text: "End"
-                    checked: root.deck.loopAuto
-                    enabled: root.deck.loaded
-                    onClicked: root.deck.endLoop()
-                }
             }
             ParamText {
-                text: "drag the loops under the timeline: ends resize, middle moves, empty lane draws · ⌥ beats"
+                text: "lane: drag ends / middle · drag empty = in/out · double-click resets · ⌥ beats"
                 tone: "faint"
                 small: true
                 wrapMode: Text.NoWrap

@@ -55,6 +55,15 @@ ParamPlate {
                 elide: Text.ElideRight
             }
             ParamText {
+                // key (rose, the shifted key when shifted) and tempo (periwinkle), at a glance
+                text: "<font color='" + Look.key + "'>" + (root.deck.keyShift !== 0 ? root.deck.shiftedKeyText : root.deck.keyText) + "</font>"
+                      + (root.deck.bpm > 0 ? "&nbsp;&nbsp;&nbsp;<font color='" + Look.tempo + "'>" + root.deck.bpm.toFixed(1) + "</font>" : "")
+                textFormat: Text.RichText
+                mono: true
+                small: true
+                wrapMode: Text.NoWrap
+            }
+            ParamText {
                 visible: root.deck.loaded
                 text: "−" + root.fmt(root.deck.duration - root.deck.position)
                 mono: true
@@ -108,40 +117,55 @@ ParamPlate {
                 property color accent: Look.tempo       // sky: sync
                 ParamButton {
                     text: "Sync"
+                    horizontalPadding: Theme.s(7)
                     checkable: true
                     checked: root.deck.sync
                     onToggled: v => root.deck.sync = v
                 }
             }
             RowLayout {
-                property color accent: Look.loop        // yellow: loops
-                spacing: Theme.s(4)
+                property color accent: Look.loop        // amber: intro · in / out · end
+                spacing: Theme.s(3)
                 ParamButton {
-                    text: root.deck.inLoop ? "Loop ●" : "Loop"
-                    checkable: true
-                    checked: root.deck.loopEnabled
-                    onToggled: v => root.deck.loopEnabled = v
-                }
-                ParamButton {
-                    // armed: the intro loops; release it to play on
                     text: "Intro"
+                    horizontalPadding: Theme.s(7)
                     checkable: true
                     checked: root.deck.introArmed
                     enabled: root.deck.loaded
                     onToggled: v => root.deck.introArmed = v
                 }
+                ParamButton {
+                    text: "In"
+                    horizontalPadding: Theme.s(7)
+                    checked: root.deck.customPending
+                    enabled: root.deck.loaded && root.deck.bpm > 0
+                    onClicked: root.deck.loopIn()
+                }
+                ParamButton {
+                    text: "Out"
+                    horizontalPadding: Theme.s(7)
+                    enabled: root.deck.customPending || root.deck.hasCustom
+                    onClicked: root.deck.loopOut()
+                }
+                ParamButton {
+                    text: "Loop"
+                    horizontalPadding: Theme.s(7)
+                    checkable: true
+                    checked: root.deck.customOn
+                    enabled: root.deck.hasCustom
+                    onToggled: v => root.deck.customOn = v
+                }
+                ParamButton {
+                    text: "End"
+                    horizontalPadding: Theme.s(7)
+                    checkable: true
+                    checked: root.deck.endArmed
+                    enabled: root.deck.loaded
+                    onToggled: v => root.deck.endArmed = v
+                }
             }
             Item { Layout.fillWidth: true }
-            ParamText {
-                // key (pink, shifted key when shifted) and tempo (sky), at a glance
-                text: "<font color='" + Look.key + "'>" + (root.deck.keyShift !== 0 ? root.deck.shiftedKeyText : root.deck.keyText) + "</font>"
-                      + (root.deck.bpm > 0 ? "&nbsp;&nbsp;&nbsp;<font color='" + Look.tempo + "'>" + root.deck.bpm.toFixed(1) + "</font>" : "")
-                textFormat: Text.RichText
-                mono: true
-                small: true
-                wrapMode: Text.NoWrap
-            }
-        }
+    }
 
         ParamSlider {
             Layout.fillWidth: true

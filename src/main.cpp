@@ -12,7 +12,8 @@
 #include <cstdio>
 
 // Debug hooks for checking the app without a person at the screen:
-//  BEATER_TEST=1          own settings and test data dirs (leaves the real library alone)
+//  BEATER_TEST=1          own settings and test data dirs (leaves the real library alone);
+//                         the window ignores real clicks and focus
 //  BEATER_AUTOPLAY=1      load playlist rows 0 and 1 into decks A and B, play, log deck state
 //  BEATER_SNAPSHOT=x.png  save a grab of the window after a few seconds, then quit
 //  BEATER_MODE=perform    start in perform (or edit) mode
@@ -85,7 +86,8 @@ int main(int argc, char *argv[])
         controller.addUrls(urls);
 
     QQmlApplicationEngine engine;
-    engine.setInitialProperties({{"app", QVariant::fromValue(&controller)}});
+    engine.setInitialProperties({{"app", QVariant::fromValue(&controller)},
+                                 {"inert", qEnvironmentVariableIsSet("BEATER_TEST")}});
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
     engine.loadFromModule("Beater", "Main");

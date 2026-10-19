@@ -44,10 +44,33 @@ QStringList DeckController::keyNames() const
     return l;
 }
 
+QString DeckController::activeLoop() const
+{
+    if (m_customOn && hasCustom())
+        return QStringLiteral("custom");
+    if (m_introArmed && m_introEnd > m_introStart)
+        return QStringLiteral("intro");
+    if (m_endArmed && m_endEnd > m_endStart)
+        return QStringLiteral("end");
+    return QString();
+}
+
+double DeckController::activeLoopStartBeat() const
+{
+    const QString a = activeLoop();
+    return a == u"custom" ? m_customStart : a == u"intro" ? m_introStart : a == u"end" ? m_endStart : 0.0;
+}
+
+double DeckController::activeLoopEndBeat() const
+{
+    const QString a = activeLoop();
+    return a == u"custom" ? m_customEnd : a == u"intro" ? m_introEnd : a == u"end" ? m_endEnd : 0.0;
+}
+
 bool DeckController::inLoop() const
 {
     const double a = activeLoopStartBeat(), e = activeLoopEndBeat();
-    if (!m_loopEnabled || e <= a || !m_rec.grid().valid())
+    if (e <= a || !m_rec.grid().valid())
         return false;
     const double b = beat();
     return b >= a && b < e;
@@ -87,7 +110,9 @@ void DeckController::loadRecord(const TrackRecord &rec)
         m_keyShift = 0;
         m_engine->deck(m_index).semitones.store(0);
         m_introArmed = true; // every track starts looping its intro
-        m_introArmedAt.start();
+        m_customOn = false;
+        m_customPending = false;
+        m_loopSwitchedAt.start();
         m_loadedAt.start();
         m_position = 0.0;
         m_preview = -1.0;
@@ -98,7 +123,6 @@ void DeckController::loadRecord(const TrackRecord &rec)
         sendGrid();
         computeLoop();
         sendLoop();
-        m_engine->post(m_index, {DeckCommand::SetLoopEnabled, m_loopEnabled ? 1.0 : 0.0});
         m_engine->post(m_index, {DeckCommand::SetSync, m_sync ? 1.0 : 0.0});
 
         emit trackChanged();
@@ -121,7 +145,8 @@ void DeckController::refreshFromLibrary(const QString &id)
     const bool keyDiff = r.key != m_rec.key || r.keyManual != m_rec.keyManual;
     const bool statusDiff = r.status != m_rec.status;
     const bool loopDiff = r.loopStartBeat != m_rec.loopStartBeat || r.loopEndBeat != m_rec.loopEndBeat
-                       || r.introStartBeat != m_rec.introStartBeat || r.introEndBeat != m_rec.introEndBeat;
+                       || r.introStartBeat != m_rec.introStartBeat || r.introEndBeat != m_rec.introEndBeat
+                       || r.customStartBeat != m_rec.customStartBeat || r.customEndBeat != m_rec.customEndBeat;
     const bool titleDiff = r.title != m_rec.title;
     m_rec = r;
     if (gridDiff) {
@@ -161,24 +186,25 @@ void DeckController::computeLoop()
 {
     const BeatGrid g = m_rec.grid();
     const bool ready = g.valid() && m_buffer;
+
     if (m_rec.hasManualLoop()) {
-        m_loopStart = m_rec.loopStartBeat;
-        m_loopEnd = m_rec.loopEndBeat;
+        m_endStart = m_rec.loopStartBeat;
+        m_endEnd = m_rec.loopEndBeat;
     } else if (ready) {
-        // Last whole bars of the track.
-        m_loopEnd = g.lastLoopBeat(m_buffer->durationSec());
-        m_loopStart = std::max(g.firstLoopBeat(), m_loopEnd - 4.0 * m_loopBars);
+        // last whole bars of the track
+        m_endEnd = g.lastLoopBeat(m_buffer->durationSec());
+        m_endStart = std::max(g.firstLoopBeat(), m_endEnd - 4.0 * m_endBars);
     } else {
-        m_loopStart = m_loopEnd = 0.0;
+        m_endStart = m_endEnd = 0.0;
     }
-    if (m_loopEnd <= m_loopStart)
-        m_loopStart = m_loopEnd = 0.0;
+    if (m_endEnd <= m_endStart)
+        m_endStart = m_endEnd = 0.0;
 
     if (m_rec.hasManualIntro()) {
         m_introStart = m_rec.introStartBeat;
         m_introEnd = m_rec.introEndBeat;
     } else if (ready) {
-        // First whole bars of the track.
+        // first whole bars of the track
         m_introStart = g.firstLoopBeat();
         m_introEnd = std::min(m_introStart + 4.0 * m_introBars, g.lastLoopBeat(m_buffer->durationSec()));
     } else {
@@ -186,12 +212,41 @@ void DeckController::computeLoop()
     }
     if (m_introEnd <= m_introStart)
         m_introStart = m_introEnd = 0.0;
+
+    if (m_rec.hasCustomLoop()) {
+        m_customStart = m_rec.customStartBeat;
+        m_customEnd = m_rec.customEndBeat;
+        m_customPending = false;
+    } else if (!m_customPending) {
+        m_customStart = m_customEnd = 0.0;
+    }
 }
 
 void DeckController::sendLoop()
 {
-    // the engine loops one region: the intro while it's armed, else the main loop
-    m_engine->post(m_index, {DeckCommand::SetLoop, activeLoopStartBeat(), activeLoopEndBeat()});
+    // the engine loops one region: the one in use, if any
+    const double a = activeLoopStartBeat(), b = activeLoopEndBeat();
+    m_engine->post(m_index, {DeckCommand::SetLoop, a, b});
+    m_engine->post(m_index, {DeckCommand::SetLoopEnabled, b > a ? 1.0 : 0.0});
+}
+
+void DeckController::jumpInto(double startBeat, double endBeat)
+{
+    // Playing: keep the place in the bar, so the deck stays in phase; paused:
+    // to the start of the loop.
+    const BeatGrid g = m_rec.grid();
+    if (!g.valid() || !m_buffer || endBeat <= startBeat)
+        return;
+    double target = startBeat;
+    if (m_playing)
+        target += std::fmod(std::fmod(beat() - startBeat, 4.0) + 4.0, 4.0);
+    target = std::min(target, endBeat - 0.01);
+    const double sec = g.secAtBeat(target);
+    m_engine->post(m_index, {DeckCommand::Seek, sec * m_engine->sampleRate()});
+    if (!m_playing) {
+        m_position = sec;
+        emit positionChanged();
+    }
 }
 
 void DeckController::updatePlayingBpm()
@@ -219,14 +274,20 @@ void DeckController::poll()
         m_previewHold.invalidate();
         emit positionChanged();
     }
-    // Past the intro (seeked, dragged, or it wasn't looping): release it, so
-    // the main loop catches the track at its end.
-    // (Only while playing, and not in the first moments after a load, when the
-    // engine may still report the previous track's position.)
-    if (introActive() && playing && m_rec.grid().valid() && m_loadedAt.isValid() && m_loadedAt.elapsed() > 200
-        && m_introArmedAt.isValid() && m_introArmedAt.elapsed() > 200
-        && m_rec.grid().beatAtSec(pos) > m_introEnd + 0.25 && m_preview < 0.0)
-        setIntroArmed(false);
+    // The playhead left the intro or the In / Out loop behind (seeked, dragged):
+    // release it, so the end loop catches the track. Only while playing, and
+    // not just after a load or a switch, when the engine may still report the
+    // position from before.
+    if (playing && m_rec.grid().valid() && m_preview < 0.0 && m_loadedAt.isValid() && m_loadedAt.elapsed() > 200
+        && m_loopSwitchedAt.isValid() && m_loopSwitchedAt.elapsed() > 200) {
+        const QString a = activeLoop();
+        if ((a == u"intro" || a == u"custom") && m_rec.grid().beatAtSec(pos) > activeLoopEndBeat() + 0.25) {
+            if (a == u"intro")
+                setIntroArmed(false);
+            else
+                setCustomOn(false);
+        }
+    }
     if (std::abs(pos - m_position) > 0.0005 || err != m_phaseError) {
         m_position = pos;
         m_phaseError = err;
@@ -438,124 +499,123 @@ void DeckController::setSync(bool on)
     updatePlayingBpm();
 }
 
-void DeckController::setLoopEnabled(bool on)
-{
-    if (on == m_loopEnabled)
-        return;
-    m_loopEnabled = on;
-    m_engine->post(m_index, {DeckCommand::SetLoopEnabled, on ? 1.0 : 0.0});
-    emit loopChanged();
-}
-
-void DeckController::setLoopBars(int bars)
-{
-    bars = std::clamp(bars, 1, 64);
-    const bool changed = bars != m_loopBars;
-    m_loopBars = bars;
-    if (changed)
-        emit loopBarsChanged();
-    // A drawn loop takes the length from its start, even when the bar count
-    // didn't change (it may have been dragged to some other length).
-    if (m_rec.hasManualLoop() && m_rec.loopEndBeat - m_rec.loopStartBeat != 4.0 * bars) {
-        m_rec.loopEndBeat = m_rec.loopStartBeat + 4.0 * bars;
-        commitRecord();
-    } else if (!changed) {
-        return;
-    }
-    computeLoop();
-    sendLoop();
-    emit loopChanged();
-}
-
-void DeckController::setLoopBeats(double startBeat, double endBeat)
-{
-    if (m_rec.id.isEmpty() || !m_rec.grid().valid())
-        return;
-    if (endBeat < startBeat)
-        std::swap(startBeat, endBeat);
-    if (endBeat - startBeat < 1.0)
-        return;
-    m_rec.loopStartBeat = startBeat;
-    m_rec.loopEndBeat = endBeat;
-    commitRecord();
-    computeLoop();
-    sendLoop();
-    if (!m_loopEnabled)
-        setLoopEnabled(true);
-    emit loopChanged();
-}
-
-void DeckController::loopHere()
-{
-    if (!m_rec.grid().valid())
-        return;
-    setIntroArmed(false); // loop here, now
-    const double start = std::floor(beat() / 4.0) * 4.0;
-    setLoopBeats(start, start + 4.0 * m_loopBars);
-}
-
-void DeckController::endLoop()
-{
-    if (m_rec.id.isEmpty())
-        return;
-    m_rec.loopStartBeat = m_rec.loopEndBeat = 0.0;
-    commitRecord();
-    computeLoop();
-    sendLoop();
-    emit loopChanged();
-}
-
 void DeckController::setIntroArmed(bool on)
 {
     if (on == m_introArmed)
         return;
     m_introArmed = on;
-    m_introArmedAt.start();
+    m_loopSwitchedAt.start();
     sendLoop();
-    // Armed with the playhead already past the intro: go back into it, so it
-    // loops now. Playing: keep the place in the bar (stays in phase); paused:
-    // to the start of the intro.
-    const BeatGrid g = m_rec.grid();
-    if (on && introActive() && g.valid() && m_buffer && beat() >= m_introEnd) {
-        double target = m_introStart;
-        if (m_playing)
-            target += std::fmod(std::fmod(beat() - m_introStart, 4.0) + 4.0, 4.0);
-        target = std::min(target, m_introEnd - 0.01);
-        const double sec = g.secAtBeat(target);
-        m_engine->post(m_index, {DeckCommand::Seek, sec * m_engine->sampleRate()});
-        if (!m_playing) {
-            m_position = sec;
-            emit positionChanged();
-        }
-    }
+    if (on && activeLoop() == u"intro" && beat() >= m_introEnd)
+        jumpInto(m_introStart, m_introEnd);
     emit loopChanged();
 }
 
-void DeckController::setIntroBars(int bars)
+void DeckController::setCustomOn(bool on)
+{
+    if (on && !hasCustom())
+        return;
+    if (on == m_customOn)
+        return;
+    m_customOn = on;
+    m_loopSwitchedAt.start();
+    sendLoop();
+    if (on && beat() >= m_customEnd)
+        jumpInto(m_customStart, m_customEnd);
+    emit loopChanged();
+}
+
+void DeckController::setEndArmed(bool on)
+{
+    if (on == m_endArmed)
+        return;
+    m_endArmed = on;
+    sendLoop();
+    emit loopChanged();
+}
+
+void DeckController::loopIn()
+{
+    if (!m_buffer || !m_rec.grid().valid())
+        return;
+    // a new In: any In / Out loop goes, the next Out closes this one
+    m_customStart = m_customEnd = std::round(beat());
+    m_customPending = true;
+    m_customOn = false;
+    if (m_rec.hasCustomLoop()) {
+        m_rec.customStartBeat = m_rec.customEndBeat = 0.0;
+        commitRecord();
+    }
+    sendLoop();
+    emit loopChanged();
+}
+
+void DeckController::loopOut()
+{
+    if (!m_buffer || !m_rec.grid().valid() || (!m_customPending && !hasCustom()))
+        return;
+    const double b = beat();
+    const double len = std::max(1.0, std::round(b - m_customStart));
+    if (b < m_customStart)
+        return;
+    m_customEnd = m_customStart + len;
+    m_customPending = false;
+    m_rec.customStartBeat = m_customStart;
+    m_rec.customEndBeat = m_customEnd;
+    commitRecord();
+    m_customOn = true;
+    m_loopSwitchedAt.start();
+    sendLoop();
+    // the Out is (about) now: back to the In, in phase
+    jumpInto(m_customStart, m_customEnd);
+    emit loopChanged();
+}
+
+void DeckController::loopHere()
+{
+    if (!m_buffer || !m_rec.grid().valid())
+        return;
+    const double start = std::floor(beat() / 4.0) * 4.0;
+    setCustomBeats(start, start + 4.0 * m_customBars);
+    setCustomOn(true);
+}
+
+void DeckController::setLoopLength(int bars)
 {
     bars = std::clamp(bars, 1, 64);
-    const bool changed = bars != m_introBars;
-    m_introBars = bars;
-    if (changed)
-        emit loopBarsChanged();
-    if (m_rec.hasManualIntro() && m_rec.introEndBeat - m_rec.introStartBeat != 4.0 * bars) {
-        m_rec.introEndBeat = m_rec.introStartBeat + 4.0 * bars;
-        commitRecord();
-    } else if (!changed) {
-        return;
+    m_customBars = bars; // the next Here
+    const QString a = activeLoop();
+    if (a == u"custom") {
+        setCustomBeats(m_customStart, m_customStart + 4.0 * bars);
+    } else if (a == u"intro") {
+        m_introBars = bars;
+        if (m_rec.hasManualIntro()) {
+            m_rec.introEndBeat = m_rec.introStartBeat + 4.0 * bars;
+            commitRecord();
+        }
+    } else if (a == u"end") {
+        m_endBars = bars;
+        if (m_rec.hasManualLoop()) {
+            m_rec.loopEndBeat = m_rec.loopStartBeat + 4.0 * bars;
+            commitRecord();
+        }
     }
     computeLoop();
     sendLoop();
     emit loopChanged();
 }
 
+// The three regions take beats on the track grid; at least a beat long.
+static bool orderedLoop(double &a, double &b)
+{
+    if (b < a)
+        std::swap(a, b);
+    return b - a >= 1.0;
+}
+
 void DeckController::setIntroBeats(double startBeat, double endBeat)
 {
-    if (m_rec.id.isEmpty() || !m_rec.grid().valid())
-        return;
-    if (endBeat < startBeat)
-        std::swap(startBeat, endBeat);
-    if (endBeat - startBeat < 1.0)
+    if (m_rec.id.isEmpty() || !m_rec.grid().valid() || !orderedLoop(startBeat, endBeat))
         return;
     m_rec.introStartBeat = startBeat;
     m_rec.introEndBeat = endBeat;
@@ -570,6 +630,53 @@ void DeckController::autoIntro()
     if (m_rec.id.isEmpty())
         return;
     m_rec.introStartBeat = m_rec.introEndBeat = 0.0;
+    commitRecord();
+    computeLoop();
+    sendLoop();
+    emit loopChanged();
+}
+
+void DeckController::setCustomBeats(double startBeat, double endBeat)
+{
+    if (m_rec.id.isEmpty() || !m_rec.grid().valid() || !orderedLoop(startBeat, endBeat))
+        return;
+    m_rec.customStartBeat = startBeat;
+    m_rec.customEndBeat = endBeat;
+    m_customPending = false;
+    commitRecord();
+    computeLoop();
+    sendLoop();
+    emit loopChanged();
+}
+
+void DeckController::clearCustom()
+{
+    m_rec.customStartBeat = m_rec.customEndBeat = 0.0;
+    m_customPending = false;
+    m_customOn = false;
+    commitRecord();
+    computeLoop();
+    sendLoop();
+    emit loopChanged();
+}
+
+void DeckController::setEndBeats(double startBeat, double endBeat)
+{
+    if (m_rec.id.isEmpty() || !m_rec.grid().valid() || !orderedLoop(startBeat, endBeat))
+        return;
+    m_rec.loopStartBeat = startBeat;
+    m_rec.loopEndBeat = endBeat;
+    commitRecord();
+    computeLoop();
+    sendLoop();
+    emit loopChanged();
+}
+
+void DeckController::autoEnd()
+{
+    if (m_rec.id.isEmpty())
+        return;
+    m_rec.loopStartBeat = m_rec.loopEndBeat = 0.0;
     commitRecord();
     computeLoop();
     sendLoop();

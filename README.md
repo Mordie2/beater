@@ -22,7 +22,7 @@ Headless engine checks: `./build/engine_test`.
 
 Files or folders passed on the command line are added to the playlist. Debug hooks
 (environment variables, see `src/main.cpp`): `BEATER_TEST=1` uses its own settings and
-Qt's test data folders instead of the real library, `BEATER_AUTOPLAY=1` loads rows 1 and 2 into
+Qt's test data folders instead of the real library (and the window ignores real clicks), `BEATER_AUTOPLAY=1` loads rows 1 and 2 into
 decks A and B, plays them and logs deck state, and `BEATER_SNAPSHOT=out.png` saves
 a grab of the window after a few seconds and quits, `BEATER_MODE=perform|edit` starts in
 that mode, `BEATER_FPS=1` logs frames per second and the time spent building waveform frames.
@@ -45,11 +45,22 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
   same way.
 - **Loading**: drag a track from the playlist onto a deck (in either mode), double-click it,
   or press A / B. Over a playing deck the drop target turns red: it replaces that track.
-- **Intro loop**: every track also has an intro loop, its first N bars (8 by default). A
-  loaded track starts with INTRO armed, so pressing play loops the intro until you release
-  it (INTRO again, in either mode); then it plays on into its main loop. Seek past the intro
-  and it releases itself.
-- **Loops**: every track has a loop region. By default it is the last N bars (END), so a track that runs out keeps looping its ending until you bring the next one in. The **loop lane** under the timeline shows the intro and the main loop as bars (the one in use solid): drag an end to resize it, the middle to move it, or the empty lane to draw a new one (snaps to bars, hold Option for beats). The bar buttons set the length of the loop in use from its start, HERE loops N bars from the current bar, END goes back to the automatic end loop. Shift-drag on the timeline draws one too.
+- **Loops**: every track has three, and the deck loops one at a time:
+  - **Intro**: its first N bars (8 by default). A loaded track starts with INTRO armed, so
+    play loops the intro until you release it.
+  - **In / Out**: a loop anywhere in between. IN marks the playhead (nearest beat); OUT
+    marks the end and the loop starts at once, jumping back to the In in phase. LOOP turns it
+    off and back on (on again with the playhead past it jumps back in). HERE makes one of
+    the chosen length from the current bar.
+  - **End**: its last N bars. Armed by default, so a track that runs out keeps looping its
+    ending until you bring in the next one.
+
+  In use: In / Out if on, else the intro if armed, else the end. A loop the playhead has
+  left behind (seeked past it) releases itself, so the end loop always catches the track.
+  The bar buttons set the length of the loop in use. The **loop lane** under the timeline
+  shows all three (in use solid, armed half lit, off dim): drag an end to resize, the middle
+  to move, the empty lane to draw an In / Out loop (Shift-drag on the timeline does too);
+  double-click a loop to reset it. Snaps to bars, hold Option for beats.
 - **Keys** show as names (F#m) by default; KEYS at the top switches to Camelot (11A). LOOP toggles looping on the deck.
 - **Volume**: a fader per deck plus master. No automatic transitions.
 - **Analysis**: BPM, beat grid and key are detected on import (tracks analyzed by an older

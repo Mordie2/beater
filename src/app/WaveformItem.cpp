@@ -303,20 +303,28 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
             for (double b = first; g.secAtBeat(b) < dur; b += 32.0)
                 node->over->add(QRectF(std::round(xAt(g.secAtBeat(b))), 0, 1, h), c);
         }
-        // the loop not in use right now (intro or main), faint
+        // the loops not in use right now, faint
         if (g.valid()) {
-            const bool intro = m_deck->introActive();
-            const double ia = intro ? m_deck->loopStartBeat() : m_deck->introStartBeat();
-            const double ib = intro ? m_deck->loopEndBeat() : m_deck->introEndBeat();
-            if (ib > ia) {
-                const double x0 = xAt(g.secAtBeat(ia)), x1 = xAt(g.secAtBeat(ib));
-                QColor fill = m_loopColor, edge = m_loopColor;
-                fill.setAlpha(10);
-                edge.setAlpha(60);
+            const QString active = m_deck->activeLoop();
+            const struct { const char *kind; double a, b; } loops[] = {
+                {"intro", m_deck->introStartBeat(), m_deck->introEndBeat()},
+                {"custom", m_deck->customStartBeat(), m_deck->customEndBeat()},
+                {"end", m_deck->endStartBeat(), m_deck->endEndBeat()},
+            };
+            QColor fill = m_loopColor, edge = m_loopColor;
+            fill.setAlpha(10);
+            edge.setAlpha(60);
+            for (const auto &l : loops) {
+                if (l.b <= l.a || active == QLatin1String(l.kind))
+                    continue;
+                const double x0 = xAt(g.secAtBeat(l.a)), x1 = xAt(g.secAtBeat(l.b));
                 node->over->add(QRectF(x0, 0, x1 - x0, h), fill);
                 node->over->add(QRectF(x0, 0, 1, h), edge);
                 node->over->add(QRectF(x1 - 1, 0, 1, h), edge);
             }
+            // an In placed, waiting for its Out
+            if (m_deck->customPending())
+                node->over->add(QRectF(xAt(g.secAtBeat(m_deck->customStartBeat())) - 1, 0, 2, h), edge);
         }
         // the loop in use (or the one being drawn with Shift)
         double la = m_deck->activeLoopStartBeat(), lb = m_deck->activeLoopEndBeat();
@@ -326,7 +334,7 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         }
         if (g.valid() && lb > la) {
             const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
-            const bool on = m_deck->loopEnabled() || m_dragging;
+            const bool on = !m_deck->activeLoop().isEmpty() || m_dragging;
             QColor fill = m_loopColor, edge = m_loopColor;
             fill.setAlpha(on ? 40 : 12);
             edge.setAlpha(on ? 220 : 70);
@@ -360,7 +368,7 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         if (g.valid() && lb > la) {
             const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
             QColor fill = m_loopColor;
-            fill.setAlpha(m_deck->loopEnabled() ? 30 : 10);
+            fill.setAlpha(30);
             node->under->add(QRectF(x0, 0, x1 - x0, h), fill);
         }
 
@@ -497,7 +505,7 @@ void WaveformItem::mouseReleaseEvent(QMouseEvent *e)
     } else if (m_dragging) {
         m_dragging = false;
         if (std::abs(m_dragB - m_dragA) >= 1.0)
-            m_deck->setLoopBeats(std::min(m_dragA, m_dragB), std::max(m_dragA, m_dragB));
+            m_deck->setCustomBeats(std::min(m_dragA, m_dragB), std::max(m_dragA, m_dragB)); // an In / Out loop
         update();
     } else {
         m_deck->seek(secAtX(e->position().x()));

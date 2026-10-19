@@ -8,13 +8,17 @@ ApplicationWindow {
     required property AppController app
 
     readonly property bool perform: prefs.perform
+    //! Test runs (BEATER_TEST): the window takes no clicks or focus, so it
+    //! can't catch input meant for the windows around it.
+    property bool inert: false
 
     visible: true
     title: "beater"
     color: Theme.page
     minimumWidth: perform ? Theme.s(360) : Theme.s(1100)
     minimumHeight: perform ? Theme.s(480) : 720
-    flags: perform && prefs.onTop ? (Qt.Window | Qt.WindowStaysOnTopHint) : Qt.Window
+    flags: (perform && prefs.onTop ? (Qt.Window | Qt.WindowStaysOnTopHint) : Qt.Window)
+           | (inert ? (Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus) : 0)
 
     // Each mode remembers its own window size.
     Settings {
