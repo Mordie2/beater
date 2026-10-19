@@ -14,7 +14,16 @@ open build/beater.app
 
 The first configure clones miniaudio and Rubber Band from GitHub (FetchContent), so it needs internet once.
 
+If `cmake` / `ninja` aren't on your PATH, use the ones Qt ships:
+`export PATH=~/Qt/Tools/CMake/CMake.app/Contents/bin:~/Qt/Tools/Ninja:$PATH`.
+
 Headless engine checks: `./build/engine_test`.
+
+Files or folders passed on the command line are added to the playlist. Debug hooks
+(environment variables, see `src/main.cpp`): `BEATER_TEST=1` uses Qt's test data
+folders instead of the real library, `BEATER_AUTOPLAY=1` loads rows 1 and 2 into
+decks A and B, plays them and logs deck state, and `BEATER_SNAPSHOT=out.png` saves
+a grab of the window after a few seconds and quits.
 
 ## How it works
 

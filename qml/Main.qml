@@ -25,7 +25,9 @@ ApplicationWindow {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 330
+            // a nested layout inherits fillHeight from its children; the playlist gets the rest
+            Layout.fillHeight: false
+            Layout.preferredHeight: 360
             Layout.margins: 10
             spacing: 10
             DeckView {
@@ -48,6 +50,7 @@ ApplicationWindow {
             app: window.app
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.minimumHeight: 150
             Layout.leftMargin: 10
             Layout.rightMargin: 10
             Layout.bottomMargin: 10
