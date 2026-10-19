@@ -87,6 +87,7 @@ void DeckController::loadRecord(const TrackRecord &rec)
         m_keyShift = 0;
         m_engine->deck(m_index).semitones.store(0);
         m_introArmed = true; // every track starts looping its intro
+        m_introArmedAt.start();
         m_loadedAt.start();
         m_position = 0.0;
         m_preview = -1.0;
@@ -223,6 +224,7 @@ void DeckController::poll()
     // (Only while playing, and not in the first moments after a load, when the
     // engine may still report the previous track's position.)
     if (introActive() && playing && m_rec.grid().valid() && m_loadedAt.isValid() && m_loadedAt.elapsed() > 200
+        && m_introArmedAt.isValid() && m_introArmedAt.elapsed() > 200
         && m_rec.grid().beatAtSec(pos) > m_introEnd + 0.25 && m_preview < 0.0)
         setIntroArmed(false);
     if (std::abs(pos - m_position) > 0.0005 || err != m_phaseError) {
@@ -508,7 +510,24 @@ void DeckController::setIntroArmed(bool on)
     if (on == m_introArmed)
         return;
     m_introArmed = on;
+    m_introArmedAt.start();
     sendLoop();
+    // Armed with the playhead already past the intro: go back into it, so it
+    // loops now. Playing: keep the place in the bar (stays in phase); paused:
+    // to the start of the intro.
+    const BeatGrid g = m_rec.grid();
+    if (on && introActive() && g.valid() && m_buffer && beat() >= m_introEnd) {
+        double target = m_introStart;
+        if (m_playing)
+            target += std::fmod(std::fmod(beat() - m_introStart, 4.0) + 4.0, 4.0);
+        target = std::min(target, m_introEnd - 0.01);
+        const double sec = g.secAtBeat(target);
+        m_engine->post(m_index, {DeckCommand::Seek, sec * m_engine->sampleRate()});
+        if (!m_playing) {
+            m_position = sec;
+            emit positionChanged();
+        }
+    }
     emit loopChanged();
 }
 

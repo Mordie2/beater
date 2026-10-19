@@ -52,7 +52,8 @@ class DeckController : public QObject {
     Q_PROPERTY(bool inLoop READ inLoop NOTIFY positionChanged)
     // The intro loop: while armed, the deck loops the intro (the first N bars,
     // or a drawn one) instead of its main loop. Armed on every load; release it
-    // to play on. It releases itself once the playhead is past it.
+    // to play on. It releases itself once the playhead is past it; arming it
+    // with the playhead past it jumps back in (in phase when playing).
     Q_PROPERTY(bool introArmed READ introArmed WRITE setIntroArmed NOTIFY loopChanged)
     Q_PROPERTY(bool introActive READ introActive NOTIFY loopChanged)
     Q_PROPERTY(double introStartBeat READ introStartBeat NOTIFY loopChanged)
@@ -220,6 +221,7 @@ private:
     double m_preview = -1.0;     // < 0: not dragging
     QElapsedTimer m_previewHold; // after commit, until the seek lands
     QElapsedTimer m_loadedAt;
+    QElapsedTimer m_introArmedAt; // the auto-release waits for an arm's jump to land
 
     QList<qint64> m_taps;
     QElapsedTimer m_tapClock;
