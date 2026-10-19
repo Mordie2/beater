@@ -50,7 +50,20 @@ static void testTempo()
         TempoResult r = estimateTempo(x, 22050);
         std::printf("  %.2f bpm @ %.3fs -> %.3f bpm @ %.4fs (conf %.2f)\n", c.bpm, c.first, r.bpm, r.firstBeatSec, r.confidence);
         CHECK(r.ok && std::abs(r.bpm - c.bpm) < 0.02, "bpm %.3f vs %.3f", r.bpm, c.bpm);
-        CHECK(std::abs(r.firstBeatSec - c.first) < 0.012, "first beat %.4f vs %.4f", r.firstBeatSec, c.first);
+        CHECK(std::abs(r.firstBeatSec - c.first) < 0.003, "first beat %.4f vs %.4f", r.firstBeatSec, c.first);
+    }
+    // A soft pad from 0:00 and the kicks from 2.123 s: the start isn't on the
+    // grid, so the phase comes from the fine envelope, not the first sound.
+    {
+        auto x = clickTrack(128.0, 2.123, 90.0, 22050);
+        for (size_t i = 0; i < size_t(4.0 * 22050); ++i) {
+            const double t = double(i) / 22050;
+            x[i] += float(0.15 * std::min(1.0, t / 1.5) * std::sin(2 * M_PI * 220.0 * t));
+        }
+        TempoResult r = estimateTempo(x, 22050);
+        std::printf("  pad intro, kicks from 2.123s -> %.3f bpm @ %.4fs\n", r.bpm, r.firstBeatSec);
+        CHECK(r.ok && std::abs(r.bpm - 128.0) < 0.02, "bpm %.3f", r.bpm);
+        CHECK(std::abs(r.firstBeatSec - 2.123) < 0.006, "first beat %.4f vs 2.123", r.firstBeatSec);
     }
 }
 
