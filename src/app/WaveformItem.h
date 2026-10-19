@@ -8,9 +8,12 @@
 class DeckController;
 
 // Waveform with beat grid, loop region and playhead.
-//  Overview mode: whole track. Click = seek (beat snapped), drag = set loop
-//  region snapped to bars (hold Alt/Option to snap to beats).
-//  Zoom mode: a window of N beats scrolling around the playhead.
+//  Overview mode: whole track. Click or drag = move the playhead: it follows
+//  the pointer and the deck jumps there on release (on the beat, or into
+//  phase with the master when synced and playing). Shift-drag = set the loop
+//  region, snapped to bars (add Alt/Option to snap to beats).
+//  Zoom mode: a window of N beats scrolling around the playhead. Drag it to
+//  move through the track the same way; the waveform follows the hand.
 class WaveformItem : public QQuickPaintedItem {
     Q_OBJECT
     QML_ELEMENT
@@ -61,7 +64,12 @@ private:
     QSizeF m_cacheSize;
 
     bool m_pressed = false;
-    bool m_dragging = false;
+    bool m_dragging = false;  // overview: shift-dragging a loop
+    bool m_loopDrag = false;  // overview: this press sets a loop (Shift)
     double m_pressX = 0.0;
     double m_dragA = 0.0, m_dragB = 0.0; // beats
+
+    // moving the playhead (the deck holds the preview)
+    bool m_scrubbing = false;  // zoom: past the drag threshold
+    double m_scrubFrom = 0.0;  // zoom: deck position at the press, s
 };

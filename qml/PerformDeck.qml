@@ -7,6 +7,7 @@ import HighlighterUI
 ParamPlate {
     id: root
     required property DeckController deck
+    required property AppController app
     property color accent: Look.deckA
 
     implicitHeight: col.implicitHeight + 2 * Theme.s(8)
@@ -15,6 +16,12 @@ ParamPlate {
         if (!(s > 0)) return "0:00"
         const t = Math.floor(s)
         return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0")
+    }
+
+    DeckDrop {
+        anchors.fill: parent
+        deck: root.deck
+        app: root.app
     }
 
     ColumnLayout {

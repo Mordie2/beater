@@ -90,6 +90,8 @@ void DeckController::loadRecord(const TrackRecord &rec)
         m_keyShift = 0;
         m_engine->deck(m_index).semitones.store(0);
         m_position = 0.0;
+        m_preview = -1.0;
+        m_previewHold.invalidate();
         ++m_waveRev;
 
         m_engine->post(m_index, {DeckCommand::Load, 0.0, 0.0, new TrackBufferPtr(m_buffer)});
@@ -198,6 +200,12 @@ void DeckController::poll()
     const bool playing = d.pubPlaying.load(std::memory_order_relaxed);
     const double level = d.pubLevel.load(std::memory_order_relaxed);
     const double err = d.pubPhaseError.load(std::memory_order_relaxed);
+    if (m_previewHold.isValid() && m_previewHold.elapsed() >= 150) {
+        // the seek has landed: back to the engine's position
+        m_preview = -1.0;
+        m_previewHold.invalidate();
+        emit positionChanged();
+    }
     if (std::abs(pos - m_position) > 0.0005 || err != m_phaseError) {
         m_position = pos;
         m_phaseError = err;
@@ -261,6 +269,30 @@ void DeckController::seek(double sec)
         m_position = t;
         emit positionChanged();
     }
+}
+
+void DeckController::setPreview(double sec)
+{
+    if (!m_buffer)
+        return;
+    m_preview = std::clamp(sec, 0.0, duration());
+    m_previewHold.invalidate();
+    emit positionChanged();
+}
+
+void DeckController::commitPreview()
+{
+    if (m_preview < 0.0)
+        return;
+    seek(m_preview);
+    m_previewHold.start();
+}
+
+double DeckController::shownPosition() const
+{
+    if (m_preview >= 0.0 && (!m_previewHold.isValid() || m_previewHold.elapsed() < 150))
+        return m_preview;
+    return m_position;
 }
 
 void DeckController::jumpBeats(double beats)

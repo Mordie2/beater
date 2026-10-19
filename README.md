@@ -38,7 +38,13 @@ that mode.
 - **Master tempo** is a fixed BPM you set (drag the number, scroll, ±, or double-click to type). Everything follows it.
 - **Sync** is on by default for each deck. A synced deck is time-stretched to the master tempo and phase-locked to the master grid (Rubber Band R3 engine, so pitch is untouched). Pressing play starts the deck immediately, already in phase: it jumps to the nearest position whose beat (or bar, with PHASE = BAR) matches the master.
 - **Key shift** in semitones, tempo stays locked. The key readout follows.
-- **Loops**: every track has a loop region. By default it is the last N bars (END), so a track that runs out keeps looping its ending until you bring the next one in. Drag across the overview waveform to set your own region (snaps to bars, hold Option to snap to beats), or use HERE to loop N bars from the current bar. LOOP toggles looping on the deck.
+- **Moving around**: click or drag on the timeline (the overview under the big waveform) and
+  the playhead follows; the deck jumps there when you let go, on the beat, or in phase with
+  the master when it's synced and playing. The big waveform can be grabbed and dragged the
+  same way.
+- **Loading**: drag a track from the playlist onto a deck (in either mode), double-click it,
+  or press A / B. Over a playing deck the drop target turns red: it replaces that track.
+- **Loops**: every track has a loop region. By default it is the last N bars (END), so a track that runs out keeps looping its ending until you bring the next one in. Shift-drag across the timeline to set your own region (snaps to bars, add Option to snap to beats), or use HERE to loop N bars from the current bar. LOOP toggles looping on the deck.
 - **Volume**: a fader per deck plus master. No automatic transitions.
 - **Analysis**: BPM, beat grid and key are detected on import (tracks analyzed by an older
   build are analyzed again once). Everything is editable: click the BPM to type it, ×2 / ÷2,

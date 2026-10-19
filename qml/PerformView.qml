@@ -44,11 +44,13 @@ Item {
         }
 
         PerformDeck {
+            app: root.app
             deck: root.app.deckA
             accent: Look.deckA
             Layout.fillWidth: true
         }
         PerformDeck {
+            app: root.app
             deck: root.app.deckB
             accent: Look.deckB
             Layout.fillWidth: true

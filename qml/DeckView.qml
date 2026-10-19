@@ -21,6 +21,13 @@ Panel {
         return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0")
     }
 
+    DeckDrop {
+        anchors.fill: parent
+        anchors.margins: -Theme.s(8)
+        deck: root.deck
+        app: root.app
+    }
+
     component Label: ParamText { caps: true; wrapMode: Text.NoWrap; Layout.alignment: Qt.AlignVCenter }
 
     ColumnLayout {

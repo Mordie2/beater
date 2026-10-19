@@ -110,6 +110,13 @@ public:
     Q_INVOKABLE void seek(double sec);
     Q_INVOKABLE void jumpBeats(double beats);
 
+    // While the user drags through the track: where it will land. Waveforms
+    // draw shownPosition(); commitPreview() jumps there (on the beat, or in
+    // phase with the master when synced and playing).
+    void setPreview(double sec);
+    void commitPreview();
+    double shownPosition() const;
+
     // grid
     Q_INVOKABLE void setBpm(double bpm);
     Q_INVOKABLE void doubleBpm() { setBpm(m_rec.bpm * 2.0); }
@@ -181,6 +188,9 @@ private:
     int m_loopBars = 8;
     double m_loopStart = 0.0, m_loopEnd = 0.0;
     double m_volume = 0.8;
+
+    double m_preview = -1.0;     // < 0: not dragging
+    QElapsedTimer m_previewHold; // after commit, until the seek lands
 
     QList<qint64> m_taps;
     QElapsedTimer m_tapClock;

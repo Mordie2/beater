@@ -11,6 +11,7 @@ WaveformItem::WaveformItem(QQuickItem *parent)
     : QQuickPaintedItem(parent)
 {
     setAcceptedMouseButtons(Qt::LeftButton);
+    setCursor(Qt::ArrowCursor);
     setAntialiasing(false);
     setOpaquePainting(false);
 }
@@ -42,6 +43,7 @@ void WaveformItem::setZoom(bool z)
     if (z == m_zoom)
         return;
     m_zoom = z;
+    setCursor(z ? Qt::OpenHandCursor : Qt::ArrowCursor);
     emit zoomChanged();
     update();
 }
@@ -169,7 +171,7 @@ void WaveformItem::paintOverview(QPainter *p)
     }
 
     // played part dimmed, playhead
-    const double px = xAt(m_deck->position());
+    const double px = xAt(m_deck->shownPosition());
     p->fillRect(QRectF(0, 0, px, h), QColor(0, 0, 0, 110));
     p->fillRect(QRectF(px - 1, 0, 2, h), QColor(255, 255, 255));
 }
@@ -181,7 +183,7 @@ void WaveformItem::paintZoom(QPainter *p)
     const TrackBuffer *tb = m_deck->buffer();
     const BeatGrid g = m_deck->grid();
     const double w = width(), h = height(), mid = h / 2.0;
-    const double pos = m_deck->position();
+    const double pos = m_deck->shownPosition();
     const double spb = g.valid() ? g.secPerBeat() : 0.5;
     const double span = m_zoomBeats * spb;
     const double t0 = pos - span / 2.0;
@@ -233,14 +235,24 @@ void WaveformItem::paintZoom(QPainter *p)
 
 void WaveformItem::mousePressEvent(QMouseEvent *e)
 {
-    if (!m_deck || !m_deck->buffer() || m_zoom) {
+    if (!m_deck || !m_deck->buffer()) {
         e->ignore();
         return;
     }
     m_pressed = true;
-    m_dragging = false;
     m_pressX = e->position().x();
+    setKeepMouseGrab(true);
     e->accept();
+    if (m_zoom) {
+        m_scrubbing = false;
+        m_scrubFrom = m_deck->position();
+        setCursor(Qt::ClosedHandCursor);
+        return;
+    }
+    m_dragging = false;
+    m_loopDrag = e->modifiers() & Qt::ShiftModifier;
+    if (!m_loopDrag)
+        m_deck->setPreview(secAtX(m_pressX));
 }
 
 void WaveformItem::mouseMoveEvent(QMouseEvent *e)
@@ -248,14 +260,29 @@ void WaveformItem::mouseMoveEvent(QMouseEvent *e)
     if (!m_pressed)
         return;
     const BeatGrid g = m_deck->grid();
+    const double x = e->position().x();
+    if (m_zoom) {
+        if (!m_scrubbing && std::abs(x - m_pressX) > 3.0)
+            m_scrubbing = true;
+        if (m_scrubbing) {
+            // the track moves with the hand: drag left to go forward
+            const double span = m_zoomBeats * (g.valid() ? g.secPerBeat() : 0.5);
+            m_deck->setPreview(m_scrubFrom - (x - m_pressX) / std::max(1.0, width()) * span);
+        }
+        return;
+    }
+    if (!m_loopDrag) {
+        m_deck->setPreview(secAtX(x));
+        return;
+    }
     if (!g.valid())
         return;
-    if (!m_dragging && std::abs(e->position().x() - m_pressX) > 4.0)
+    if (!m_dragging && std::abs(x - m_pressX) > 4.0)
         m_dragging = true;
     if (m_dragging) {
         const bool fine = e->modifiers() & Qt::AltModifier;
         m_dragA = snapBeat(g.beatAtSec(secAtX(m_pressX)), fine);
-        m_dragB = snapBeat(g.beatAtSec(secAtX(e->position().x())), fine);
+        m_dragB = snapBeat(g.beatAtSec(secAtX(x)), fine);
         update();
     }
 }
@@ -265,7 +292,18 @@ void WaveformItem::mouseReleaseEvent(QMouseEvent *e)
     if (!m_pressed)
         return;
     m_pressed = false;
-    if (m_dragging) {
+    setKeepMouseGrab(false);
+    if (m_zoom) {
+        setCursor(Qt::OpenHandCursor);
+        if (m_scrubbing) {
+            m_scrubbing = false;
+            m_deck->commitPreview();
+        }
+        return;
+    }
+    if (!m_loopDrag) {
+        m_deck->commitPreview();
+    } else if (m_dragging) {
         m_dragging = false;
         if (std::abs(m_dragB - m_dragA) >= 1.0)
             m_deck->setLoopBeats(std::min(m_dragA, m_dragB), std::max(m_dragA, m_dragB));
