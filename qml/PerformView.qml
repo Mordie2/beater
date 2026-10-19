@@ -19,6 +19,7 @@ Item {
         RowLayout {
             spacing: Theme.s(8)
             MasterTempo {
+                // sky: tempo
                 app: root.app
                 digitHeight: Theme.s(20)
             }
@@ -57,7 +58,7 @@ Item {
         }
 
         ParamSlider {
-            property color accent: Theme.text   // neutral, like the edit view's master fader
+            property color accent: Look.neutral   // neutral, like the edit view's master fader
             Layout.fillWidth: true
             key: "perform.master"
             label: "master"

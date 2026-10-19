@@ -9,7 +9,8 @@ import HighlighterUI
 Item {
     id: lane
     required property DeckController deck
-    readonly property color tint: Theme.accentAt(lane, Window.window)
+    property color accent: Look.loop
+    readonly property color tint: accent
 
     implicitHeight: Theme.s(18)
 

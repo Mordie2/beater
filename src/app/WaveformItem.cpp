@@ -198,6 +198,7 @@ WaveformItem::WaveformItem(QQuickItem *parent)
     setClip(true);
     setAcceptedMouseButtons(Qt::LeftButton);
     setCursor(Qt::ArrowCursor);
+    connect(this, &WaveformItem::colorChanged, this, [this] { update(); }); // gridColor / loopColor
 }
 
 void WaveformItem::setDeck(DeckController *d)
@@ -297,8 +298,10 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         // phrase markers every 8 bars
         if (g.valid()) {
             const double first = std::ceil(g.beatAtSec(0) / 32.0) * 32.0;
+            QColor c = m_gridColor;
+            c.setAlpha(45);
             for (double b = first; g.secAtBeat(b) < dur; b += 32.0)
-                node->over->add(QRectF(std::round(xAt(g.secAtBeat(b))), 0, 1, h), QColor(255, 255, 255, 28));
+                node->over->add(QRectF(std::round(xAt(g.secAtBeat(b))), 0, 1, h), c);
         }
         // the loop not in use right now (intro or main), faint
         if (g.valid()) {
@@ -307,9 +310,12 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
             const double ib = intro ? m_deck->loopEndBeat() : m_deck->introEndBeat();
             if (ib > ia) {
                 const double x0 = xAt(g.secAtBeat(ia)), x1 = xAt(g.secAtBeat(ib));
-                node->over->add(QRectF(x0, 0, x1 - x0, h), QColor(255, 255, 255, 8));
-                node->over->add(QRectF(x0, 0, 1, h), QColor(255, 255, 255, 45));
-                node->over->add(QRectF(x1 - 1, 0, 1, h), QColor(255, 255, 255, 45));
+                QColor fill = m_loopColor, edge = m_loopColor;
+                fill.setAlpha(10);
+                edge.setAlpha(60);
+                node->over->add(QRectF(x0, 0, x1 - x0, h), fill);
+                node->over->add(QRectF(x0, 0, 1, h), edge);
+                node->over->add(QRectF(x1 - 1, 0, 1, h), edge);
             }
         }
         // the loop in use (or the one being drawn with Shift)
@@ -321,8 +327,10 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         if (g.valid() && lb > la) {
             const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
             const bool on = m_deck->loopEnabled() || m_dragging;
-            const QColor edge(255, 255, 255, on ? 170 : 60);
-            node->over->add(QRectF(x0, 0, x1 - x0, h), QColor(255, 255, 255, on ? 34 : 12));
+            QColor fill = m_loopColor, edge = m_loopColor;
+            fill.setAlpha(on ? 40 : 12);
+            edge.setAlpha(on ? 220 : 70);
+            node->over->add(QRectF(x0, 0, x1 - x0, h), fill);
             node->over->add(QRectF(x0, 0, 1.5, h), edge);
             node->over->add(QRectF(x1 - 1.5, 0, 1.5, h), edge);
             node->over->add(QRectF(x0, 0, x1 - x0, 3), edge);
@@ -351,7 +359,9 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         const double la = m_deck->activeLoopStartBeat(), lb = m_deck->activeLoopEndBeat();
         if (g.valid() && lb > la) {
             const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
-            node->under->add(QRectF(x0, 0, x1 - x0, h), QColor(255, 255, 255, m_deck->loopEnabled() ? 22 : 8));
+            QColor fill = m_loopColor;
+            fill.setAlpha(m_deck->loopEnabled() ? 30 : 10);
+            node->under->add(QRectF(x0, 0, x1 - x0, h), fill);
         }
 
         // the tiles in view
@@ -385,7 +395,9 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
             for (double b = bFirst; g.secAtBeat(b) < t0 + span; b += 1.0) {
                 const double x = xAt(g.secAtBeat(b));
                 const bool bar = std::fmod(std::fmod(b, 4.0) + 4.0, 4.0) < 0.5;
-                node->over->add(QRectF(x - (bar ? 1.0 : 0.5), 0, bar ? 2.0 : 1.0, h), QColor(255, 255, 255, bar ? 150 : 50));
+                QColor c = m_gridColor;
+                c.setAlpha(bar ? 170 : 60);
+                node->over->add(QRectF(x - (bar ? 1.0 : 0.5), 0, bar ? 2.0 : 1.0, h), c);
             }
         }
         // fixed playhead in the middle

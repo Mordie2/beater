@@ -12,7 +12,7 @@ Rectangle {
     implicitHeight: lcd.height + Theme.s(12)
     color: Theme.screen
     border.width: 1
-    border.color: mouse.pressed || typed.editing ? Theme.accent : Theme.line
+    border.color: mouse.pressed || typed.editing ? Look.tempo : Theme.line
 
     ParamSevenSeg {
         id: lcd
@@ -20,6 +20,7 @@ Rectangle {
         visible: !typed.editing
         digits: 5
         digitHeight: root.digitHeight
+        ink: Look.tempo
         text: root.app.masterBpm.toFixed(2)
     }
     ParamValueBox {

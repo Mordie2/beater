@@ -35,7 +35,7 @@ Panel {
                 barHeight: meters.barHeight
             }
             ParamLevel {
-                property color accent: Theme.text
+                property color accent: Look.neutral
                 label: "M"
                 value: root.app.masterLevel
                 warnAt: 0.9
@@ -71,7 +71,7 @@ Panel {
                 onMoved: v => root.app.deckB.volume = v / 100
             }
             ParamSlider {
-                property color accent: Theme.text   // neutral, like the master meter
+                property color accent: Look.neutral   // neutral, like the master meter
                 Layout.fillWidth: true
                 key: "mix.master"
                 label: "master"

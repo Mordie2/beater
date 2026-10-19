@@ -24,6 +24,8 @@ class WaveformItem : public QQuickItem {
     Q_PROPERTY(bool zoom READ zoom WRITE setZoom NOTIFY zoomChanged)
     Q_PROPERTY(double zoomBeats READ zoomBeats WRITE setZoomBeats NOTIFY zoomChanged)
     Q_PROPERTY(QColor color READ color WRITE setColor NOTIFY colorChanged)
+    Q_PROPERTY(QColor gridColor MEMBER m_gridColor NOTIFY colorChanged)  // beat / phrase lines
+    Q_PROPERTY(QColor loopColor MEMBER m_loopColor NOTIFY colorChanged)  // loop regions
 
 public:
     explicit WaveformItem(QQuickItem *parent = nullptr);
@@ -59,6 +61,8 @@ private:
     bool m_zoom = false;
     double m_zoomBeats = 16.0;
     QColor m_color = QColor(255, 90, 54);
+    QColor m_gridColor = QColor(255, 255, 255);
+    QColor m_loopColor = QColor(255, 255, 255);
     int m_trackRev = 0; // bumped when the track changes, so cached textures go
 
     bool m_pressed = false;

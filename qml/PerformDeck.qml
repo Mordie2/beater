@@ -72,6 +72,8 @@ ParamPlate {
                 anchors.fill: parent
                 deck: root.deck
                 color: root.accent
+                gridColor: Look.tempo
+                loopColor: Look.loop
             }
             // the deck's level along the bottom edge (under the loop lane)
             Rectangle {
@@ -91,39 +93,50 @@ ParamPlate {
 
         RowLayout {
             spacing: Theme.s(4)
-            ParamButton {
-                implicitWidth: Theme.s(40)
-                accent: true
-                icon: root.deck.playing ? "❚❚" : "▶"
-                enabled: root.deck.loaded
-                onClicked: root.deck.togglePlay()
+            RowLayout {
+                property color accent: Look.transport   // mint: transport
+                spacing: Theme.s(4)
+                ParamButton {
+                    implicitWidth: Theme.s(40)
+                    accent: true
+                    icon: root.deck.playing ? "\u275A\u275A" : "\u25B6"
+                    enabled: root.deck.loaded
+                    onClicked: root.deck.togglePlay()
+                }
             }
-            ParamButton {
-                text: "Sync"
-                checkable: true
-                checked: root.deck.sync
-                onToggled: v => root.deck.sync = v
+            RowLayout {
+                property color accent: Look.tempo       // sky: sync
+                ParamButton {
+                    text: "Sync"
+                    checkable: true
+                    checked: root.deck.sync
+                    onToggled: v => root.deck.sync = v
+                }
             }
-            ParamButton {
-                text: root.deck.inLoop ? "Loop ●" : "Loop"
-                checkable: true
-                checked: root.deck.loopEnabled
-                onToggled: v => root.deck.loopEnabled = v
-            }
-            ParamButton {
-                // armed: the intro loops; release it to play on
-                text: "Intro"
-                checkable: true
-                checked: root.deck.introArmed
-                enabled: root.deck.loaded
-                onToggled: v => root.deck.introArmed = v
+            RowLayout {
+                property color accent: Look.loop        // yellow: loops
+                spacing: Theme.s(4)
+                ParamButton {
+                    text: root.deck.inLoop ? "Loop ●" : "Loop"
+                    checkable: true
+                    checked: root.deck.loopEnabled
+                    onToggled: v => root.deck.loopEnabled = v
+                }
+                ParamButton {
+                    // armed: the intro loops; release it to play on
+                    text: "Intro"
+                    checkable: true
+                    checked: root.deck.introArmed
+                    enabled: root.deck.loaded
+                    onToggled: v => root.deck.introArmed = v
+                }
             }
             Item { Layout.fillWidth: true }
             ParamText {
-                // key (shifted key when shifted) and tempo, at a glance
-                text: (root.deck.keyShift !== 0 ? root.deck.shiftedKeyText : root.deck.keyText)
-                      + (root.deck.bpm > 0 ? "   " + root.deck.bpm.toFixed(1) : "")
-                color: Theme.textDim
+                // key (pink, shifted key when shifted) and tempo (sky), at a glance
+                text: "<font color='" + Look.key + "'>" + (root.deck.keyShift !== 0 ? root.deck.shiftedKeyText : root.deck.keyText) + "</font>"
+                      + (root.deck.bpm > 0 ? "&nbsp;&nbsp;&nbsp;<font color='" + Look.tempo + "'>" + root.deck.bpm.toFixed(1) + "</font>" : "")
+                textFormat: Text.RichText
                 mono: true
                 small: true
                 wrapMode: Text.NoWrap

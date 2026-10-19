@@ -41,7 +41,7 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        Theme.accent = Look.deckA
+        Theme.accent = Look.neutral   // the app's own controls; colour means a kind of control (Look)
         Theme.slidersStartMinimised = false   // volume faders want the full bar
         width = perform ? prefs.performWidth : prefs.editWidth
         height = perform ? prefs.performHeight : prefs.editHeight

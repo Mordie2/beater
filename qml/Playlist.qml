@@ -181,7 +181,7 @@ Panel {
                     }
                     ParamText {
                         text: row.status === "analyzing" ? "…" : row.status.startsWith("error") ? "error" : row.bpmText + (row.gridManual ? "*" : "")
-                        color: row.status.startsWith("error") ? Theme.danger : Theme.accent
+                        color: row.status.startsWith("error") ? Theme.danger : Look.tempo
                         mono: true
                         wrapMode: Text.NoWrap
                         small: root.compact
@@ -189,6 +189,7 @@ Panel {
                     }
                     ParamText {
                         text: row.keyText
+                        color: Look.key
                         mono: true
                         small: root.compact
                         wrapMode: Text.NoWrap

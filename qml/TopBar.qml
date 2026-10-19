@@ -13,8 +13,9 @@ Item {
         spacing: Theme.s(24)
 
         Text {
-            text: "BEATER"
-            color: Theme.accent
+            // the two decks' colours
+            text: "<font color='" + Look.deckA + "'>BEAT</font><font color='" + Look.deckB + "'>ER</font>"
+            textFormat: Text.RichText
             font.family: Theme.family
             font.pixelSize: Theme.s(20)
             font.weight: Font.Black
@@ -30,8 +31,9 @@ Item {
         Item { Layout.fillWidth: true }
 
         Column {
+            property color accent: Look.tempo
             spacing: Theme.s(4)
-            ParamText { text: "master bpm"; caps: true; wrapMode: Text.NoWrap }
+            ParamText { text: "master bpm"; caps: true; wrapMode: Text.NoWrap; color: Look.label(Look.tempo) }
             Row {
                 spacing: Theme.s(4)
                 ParamButton { text: "−1"; onClicked: root.app.nudgeMasterBpm(-1); anchors.verticalCenter: parent.verticalCenter }
@@ -43,14 +45,16 @@ Item {
         }
 
         Column {
+            property color accent: Look.tempo
             spacing: Theme.s(4)
-            ParamText { text: "bar"; caps: true; wrapMode: Text.NoWrap }
+            ParamText { text: "bar"; caps: true; wrapMode: Text.NoWrap; color: Look.label(Look.tempo) }
             BeatLights { app: root.app }
         }
 
         Column {
+            property color accent: Look.tempo
             spacing: Theme.s(4)
-            ParamText { text: "phase lock"; caps: true; wrapMode: Text.NoWrap }
+            ParamText { text: "phase lock"; caps: true; wrapMode: Text.NoWrap; color: Look.label(Look.tempo) }
             ParamChoice {
                 width: Theme.s(110)
                 model: ["Beat", "Bar"]

@@ -79,6 +79,8 @@ Panel {
                 zoom: true
                 zoomBeats: 16
                 color: root.accent
+                gridColor: Look.tempo
+                loopColor: Look.loop
             }
             // phase error vs master (only meaningful with sync on)
             Rectangle {
@@ -103,6 +105,8 @@ Panel {
                     anchors.fill: parent
                     deck: root.deck
                     color: root.accent
+                    gridColor: Look.tempo
+                    loopColor: Look.loop
                 }
             }
             LoopLane {
@@ -111,95 +115,108 @@ Panel {
             }
         }
 
-        // ---- transport, tempo ----
+        // ---- transport (mint) · sync, tempo (sky) ----
         RowLayout {
             spacing: Theme.s(4)
-            ParamButton {
-                implicitWidth: Theme.s(92)
-                accent: true
-                icon: root.deck.playing ? "❚❚" : "▶"
-                text: root.deck.playing ? "Pause" : "Play"
-                enabled: root.deck.loaded
-                onClicked: root.deck.togglePlay()
+            RowLayout {
+                property color accent: Look.transport
+                spacing: Theme.s(4)
+                ParamButton {
+                    implicitWidth: Theme.s(92)
+                    accent: true
+                    icon: root.deck.playing ? "\u275A\u275A" : "\u25B6"
+                    text: root.deck.playing ? "Pause" : "Play"
+                    enabled: root.deck.loaded
+                    onClicked: root.deck.togglePlay()
+                }
+                ParamButton { text: "Cue"; enabled: root.deck.loaded; onClicked: root.deck.cue() }
+                ParamButton { icon: "\u25C0\u25C0"; implicitWidth: Theme.s(34); enabled: root.deck.loaded; onClicked: root.deck.jumpBeats(-16) }
+                ParamButton { icon: "\u25B6\u25B6"; implicitWidth: Theme.s(34); enabled: root.deck.loaded; onClicked: root.deck.jumpBeats(16) }
             }
-            ParamButton { text: "Cue"; enabled: root.deck.loaded; onClicked: root.deck.cue() }
-            ParamButton {
-                text: "Sync"
-                checkable: true
-                checked: root.deck.sync
-                onToggled: v => root.deck.sync = v
-            }
-            ParamButton { icon: "◀◀"; implicitWidth: Theme.s(34); enabled: root.deck.loaded; onClicked: root.deck.jumpBeats(-16) }
-            ParamButton { icon: "▶▶"; implicitWidth: Theme.s(34); enabled: root.deck.loaded; onClicked: root.deck.jumpBeats(16) }
 
             Item { Layout.fillWidth: true }
 
-            Label { text: root.deck.analyzing ? "bpm …" : root.deck.gridManual ? "bpm *" : "bpm" }
-            // click to type, Up / Down step 0.01 (Shift 1)
-            ParamValueBox {
-                visible: root.deck.bpm > 0
-                Layout.alignment: Qt.AlignVCenter
-                value: root.deck.bpm
-                decimals: 2
-                interactive: root.deck.loaded
-                fontSize: Theme.s(16)
-                boxHeight: Theme.s(26)
-                onSubmitted: v => root.deck.setBpm(v)
-                onStepped: (d, big) => root.deck.setBpm(root.deck.bpm + d * (big ? 1 : 0.01))
+            RowLayout {
+                property color accent: Look.tempo
+                spacing: Theme.s(4)
+                ParamButton {
+                    text: "Sync"
+                    checkable: true
+                    checked: root.deck.sync
+                    onToggled: v => root.deck.sync = v
+                }
+                Gap {}
+                Label { text: root.deck.analyzing ? "bpm …" : root.deck.gridManual ? "bpm *" : "bpm"; color: Look.label(Look.tempo) }
+                // click to type, Up / Down step 0.01 (Shift 1)
+                ParamValueBox {
+                    visible: root.deck.bpm > 0
+                    Layout.alignment: Qt.AlignVCenter
+                    value: root.deck.bpm
+                    decimals: 2
+                    interactive: root.deck.loaded
+                    fontSize: Theme.s(16)
+                    boxHeight: Theme.s(26)
+                    onSubmitted: v => root.deck.setBpm(v)
+                    onStepped: (d, big) => root.deck.setBpm(root.deck.bpm + d * (big ? 1 : 0.01))
+                }
+                ParamText {
+                    text: root.deck.playingBpm > 0 ? "→ " + root.deck.playingBpm.toFixed(2) : ""
+                    color: Look.tempo
+                    mono: true
+                    wrapMode: Text.NoWrap
+                    Layout.preferredWidth: Theme.s(70)
+                }
+                Gap {}
+                ParamButton { text: "×2"; enabled: root.deck.bpm > 0; onClicked: root.deck.doubleBpm() }
+                ParamButton { text: "÷2"; enabled: root.deck.bpm > 0; onClicked: root.deck.halveBpm() }
+                ParamButton { text: "Tap"; enabled: root.deck.loaded; onClicked: root.deck.tap() }
+                ParamButton { text: "=M"; enabled: root.deck.bpm > 0; onClicked: root.app.matchMasterTo(root.deck.index) }
             }
-            ParamText {
-                text: root.deck.playingBpm > 0 ? "→ " + root.deck.playingBpm.toFixed(2) : ""
-                color: root.deck.sync ? root.accent : Theme.text
-                mono: true
-                wrapMode: Text.NoWrap
-                Layout.preferredWidth: Theme.s(70)
-            }
-            Gap {}
-            ParamButton { text: "×2"; enabled: root.deck.bpm > 0; onClicked: root.deck.doubleBpm() }
-            ParamButton { text: "÷2"; enabled: root.deck.bpm > 0; onClicked: root.deck.halveBpm() }
-            ParamButton { text: "Tap"; enabled: root.deck.loaded; onClicked: root.deck.tap() }
-            ParamButton { text: "=M"; enabled: root.deck.bpm > 0; onClicked: root.app.matchMasterTo(root.deck.index) }
         }
 
-        // ---- loop ----
+        // ---- loops (yellow) ----
         RowLayout {
             spacing: Theme.s(4)
-            Label { text: "loop"; Layout.rightMargin: Theme.s(4) }
-            ParamButton {
-                text: "On"
-                checkable: true
-                checked: root.deck.loopEnabled
-                onToggled: v => root.deck.loopEnabled = v
-            }
-            ParamButton {
-                // armed: loop the intro; release to play on into the main loop
-                text: "Intro"
-                checkable: true
-                checked: root.deck.introArmed
-                enabled: root.deck.loaded
-                onToggled: v => root.deck.introArmed = v
-            }
-            ParamChoice {
-                Layout.preferredWidth: implicitWidth
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 6 * Theme.s(34)
-                cellMinWidth: Theme.s(30)
-                model: ["1", "2", "4", "8", "16", "32"]
-                // the length of the loop in use (none lit when it's not one of these)
-                currentIndex: model.indexOf(String((root.deck.activeLoopEndBeat - root.deck.activeLoopStartBeat) / 4))
-                onActivated: i => {
-                    if (root.deck.introActive) root.deck.introBars = parseInt(model[i])
-                    else root.deck.loopBars = parseInt(model[i])
+            RowLayout {
+                property color accent: Look.loop
+                spacing: Theme.s(4)
+                Label { text: "loop"; color: Look.label(Look.loop); Layout.rightMargin: Theme.s(4) }
+                ParamButton {
+                    text: "On"
+                    checkable: true
+                    checked: root.deck.loopEnabled
+                    onToggled: v => root.deck.loopEnabled = v
                 }
-            }
-            Label { text: "bars" }
-            ParamButton { text: "Here"; enabled: root.deck.loaded && root.deck.bpm > 0; onClicked: root.deck.loopHere() }
-            ParamButton {
-                // not checkable: End goes back to the automatic end loop, it doesn't switch off
-                text: "End"
-                checked: root.deck.loopAuto
-                enabled: root.deck.loaded
-                onClicked: root.deck.endLoop()
+                ParamButton {
+                    // armed: loop the intro; release to play on into the main loop
+                    text: "Intro"
+                    checkable: true
+                    checked: root.deck.introArmed
+                    enabled: root.deck.loaded
+                    onToggled: v => root.deck.introArmed = v
+                }
+                ParamChoice {
+                    Layout.preferredWidth: implicitWidth
+                    Layout.alignment: Qt.AlignVCenter
+                    implicitWidth: 6 * Theme.s(34)
+                    cellMinWidth: Theme.s(30)
+                    model: ["1", "2", "4", "8", "16", "32"]
+                    // the length of the loop in use (none lit when it's not one of these)
+                    currentIndex: model.indexOf(String((root.deck.activeLoopEndBeat - root.deck.activeLoopStartBeat) / 4))
+                    onActivated: i => {
+                        if (root.deck.introActive) root.deck.introBars = parseInt(model[i])
+                        else root.deck.loopBars = parseInt(model[i])
+                    }
+                }
+                Label { text: "bars"; color: Look.label(Look.loop) }
+                ParamButton { text: "Here"; enabled: root.deck.loaded && root.deck.bpm > 0; onClicked: root.deck.loopHere() }
+                ParamButton {
+                    // not checkable: End goes back to the automatic end loop, it doesn't switch off
+                    text: "End"
+                    checked: root.deck.loopAuto
+                    enabled: root.deck.loaded
+                    onClicked: root.deck.endLoop()
+                }
             }
             ParamText {
                 text: "drag the loops under the timeline: ends resize, middle moves, empty lane draws · ⌥ beats"
@@ -212,49 +229,61 @@ Panel {
             }
         }
 
-        // ---- grid, key ----
+        // ---- grid (sky) · key (pink) ----
         RowLayout {
             spacing: Theme.s(4)
-            Label { text: "grid"; Layout.rightMargin: Theme.s(4) }
-            ParamButton { icon: "◀"; implicitWidth: Theme.s(28); enabled: root.deck.bpm > 0; onClicked: root.deck.nudgeGrid(-5) }
-            ParamButton { icon: "▶"; implicitWidth: Theme.s(28); enabled: root.deck.bpm > 0; onClicked: root.deck.nudgeGrid(5) }
-            ParamButton { text: "Set 1"; enabled: root.deck.bpm > 0; onClicked: root.deck.setDownbeatHere() }
-            // back to the detected BPM and grid
-            ParamButton { text: "Auto"; enabled: root.deck.gridManual && !root.deck.analyzing; onClicked: root.deck.autoGrid() }
+            RowLayout {
+                property color accent: Look.tempo
+                spacing: Theme.s(4)
+                Label { text: "grid"; color: Look.label(Look.tempo); Layout.rightMargin: Theme.s(4) }
+                ParamButton { icon: "\u25C0"; implicitWidth: Theme.s(28); enabled: root.deck.bpm > 0; onClicked: root.deck.nudgeGrid(-5) }
+                ParamButton { icon: "\u25B6"; implicitWidth: Theme.s(28); enabled: root.deck.bpm > 0; onClicked: root.deck.nudgeGrid(5) }
+                ParamButton { text: "Set 1"; enabled: root.deck.bpm > 0; onClicked: root.deck.setDownbeatHere() }
+                // back to the detected BPM and grid
+                ParamButton { text: "Auto"; enabled: root.deck.gridManual && !root.deck.analyzing; onClicked: root.deck.autoGrid() }
+            }
 
             Item { Layout.fillWidth: true }
 
-            Label { text: root.deck.analyzing ? "key …" : root.deck.keyManual ? "key *" : "key"; Layout.rightMargin: Theme.s(4) }
-            ParamCombo {
-                Layout.preferredWidth: Theme.s(110)
-                enabled: root.deck.loaded
-                model: root.deck.keyNames
-                currentIndex: root.deck.key
-                onActivated: i => root.deck.setKey(i)
-            }
-            // back to the detected key
-            ParamButton { text: "Auto"; enabled: root.deck.keyManual && !root.deck.analyzing; onClicked: root.deck.autoKey() }
-            Gap {}
-            Label { text: "shift"; Layout.rightMargin: Theme.s(4) }
-            ParamButton { text: "−"; implicitWidth: Theme.s(28); enabled: root.deck.keyShift > -12; onClicked: root.deck.keyShift = root.deck.keyShift - 1 }
-            ParamValueBox {
-                Layout.alignment: Qt.AlignVCenter
-                value: root.deck.keyShift
-                unit: " st"
-                boxHeight: Theme.s(26)
-                onSubmitted: v => root.deck.keyShift = Math.round(v)
-                onStepped: (d, big) => root.deck.keyShift = root.deck.keyShift + d * (big ? 12 : 1)
-            }
-            ParamButton { text: "+"; implicitWidth: Theme.s(28); enabled: root.deck.keyShift < 12; onClicked: root.deck.keyShift = root.deck.keyShift + 1 }
-            ParamButton { text: "0"; implicitWidth: Theme.s(28); enabled: root.deck.keyShift !== 0; onClicked: root.deck.keyShift = 0 }
-            ParamText {
-                // always there (empty when not shifted), so nothing moves when it appears
-                text: root.deck.keyShift !== 0 && root.deck.key >= 0 ? "→ " + root.deck.shiftedKeyText : ""
-                color: root.accent
-                mono: true
-                wrapMode: Text.NoWrap
-                Layout.preferredWidth: Theme.s(60)
-                Layout.leftMargin: Theme.s(6)
+            RowLayout {
+                property color accent: Look.key
+                spacing: Theme.s(4)
+                Label {
+                    text: root.deck.analyzing ? "key …" : root.deck.keyManual ? "key *" : "key"
+                    color: Look.label(Look.key)
+                    Layout.rightMargin: Theme.s(4)
+                }
+                ParamCombo {
+                    Layout.preferredWidth: Theme.s(110)
+                    enabled: root.deck.loaded
+                    model: root.deck.keyNames
+                    currentIndex: root.deck.key
+                    onActivated: i => root.deck.setKey(i)
+                }
+                // back to the detected key
+                ParamButton { text: "Auto"; enabled: root.deck.keyManual && !root.deck.analyzing; onClicked: root.deck.autoKey() }
+                Gap {}
+                Label { text: "shift"; color: Look.label(Look.key); Layout.rightMargin: Theme.s(4) }
+                ParamButton { text: "−"; implicitWidth: Theme.s(28); enabled: root.deck.keyShift > -12; onClicked: root.deck.keyShift = root.deck.keyShift - 1 }
+                ParamValueBox {
+                    Layout.alignment: Qt.AlignVCenter
+                    value: root.deck.keyShift
+                    unit: " st"
+                    boxHeight: Theme.s(26)
+                    onSubmitted: v => root.deck.keyShift = Math.round(v)
+                    onStepped: (d, big) => root.deck.keyShift = root.deck.keyShift + d * (big ? 12 : 1)
+                }
+                ParamButton { text: "+"; implicitWidth: Theme.s(28); enabled: root.deck.keyShift < 12; onClicked: root.deck.keyShift = root.deck.keyShift + 1 }
+                ParamButton { text: "0"; implicitWidth: Theme.s(28); enabled: root.deck.keyShift !== 0; onClicked: root.deck.keyShift = 0 }
+                ParamText {
+                    // always there (empty when not shifted), so nothing moves when it appears
+                    text: root.deck.keyShift !== 0 && root.deck.key >= 0 ? "→ " + root.deck.shiftedKeyText : ""
+                    color: Look.key
+                    mono: true
+                    wrapMode: Text.NoWrap
+                    Layout.preferredWidth: Theme.s(60)
+                    Layout.leftMargin: Theme.s(6)
+                }
             }
         }
     }
