@@ -1,4 +1,5 @@
 #include "app/AppController.h"
+#include "app/WaveformItem.h"
 
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -15,6 +16,7 @@
 //  BEATER_AUTOPLAY=1      load playlist rows 0 and 1 into decks A and B, play, log deck state
 //  BEATER_SNAPSHOT=x.png  save a grab of the window after a few seconds, then quit
 //  BEATER_MODE=perform    start in perform (or edit) mode
+//  BEATER_FPS=1           log frames per second and the time spent painting waveforms
 static void installDebugHooks(QQmlApplicationEngine &engine, AppController &controller)
 {
     if (qEnvironmentVariableIsSet("BEATER_AUTOPLAY")) {
@@ -32,6 +34,19 @@ static void installDebugHooks(QQmlApplicationEngine &engine, AppController &cont
         QTimer::singleShot(500, &controller, [&controller] { controller.loadToDeck(0, 0); });
         QTimer::singleShot(4000, &controller, [&controller] { controller.loadToDeck(1, 1); });
         log->start(1000);
+    }
+    if (qEnvironmentVariableIsSet("BEATER_FPS") && !engine.rootObjects().isEmpty()) {
+        if (auto *w = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
+            auto *frames = new int(0);
+            QObject::connect(w, &QQuickWindow::frameSwapped, w, [frames] { ++*frames; }, Qt::DirectConnection);
+            auto *t = new QTimer(w);
+            QObject::connect(t, &QTimer::timeout, w, [w, frames] {
+                std::fprintf(stderr, "fps %d, waveform render %.1f ms/s%s\n", *frames, WaveformItem::takeRenderMs(),
+                             w->isExposed() ? "" : " (window hidden: not drawing)");
+                *frames = 0;
+            });
+            t->start(1000);
+        }
     }
     const QString mode = qEnvironmentVariable("BEATER_MODE");
     if (!mode.isEmpty() && !engine.rootObjects().isEmpty())

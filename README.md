@@ -25,7 +25,7 @@ Files or folders passed on the command line are added to the playlist. Debug hoo
 Qt's test data folders instead of the real library, `BEATER_AUTOPLAY=1` loads rows 1 and 2 into
 decks A and B, plays them and logs deck state, and `BEATER_SNAPSHOT=out.png` saves
 a grab of the window after a few seconds and quits, `BEATER_MODE=perform|edit` starts in
-that mode.
+that mode, `BEATER_FPS=1` logs frames per second and the time spent building waveform frames.
 
 ## How it works
 

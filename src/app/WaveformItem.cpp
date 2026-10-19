@@ -1,19 +1,203 @@
 #include "app/WaveformItem.h"
 #include "app/DeckController.h"
 
+#include <QElapsedTimer>
+#include <QHash>
+#include <QImage>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QQuickWindow>
+#include <QSGSimpleRectNode>
+#include <QSGSimpleTextureNode>
+#include <QSGTexture>
 
 #include <cmath>
 
-WaveformItem::WaveformItem(QQuickItem *parent)
-    : QQuickPaintedItem(parent)
+namespace {
+
+constexpr int kTileWidth = 2048; // device pixels per zoom tile
+constexpr int kMaxTiles = 12;    // zoom tiles kept per waveform
+
+// Plain rectangles for this frame; the nodes are reused from frame to frame.
+class RectLayer : public QSGNode {
+public:
+    void begin() { m_used = 0; }
+    void add(const QRectF &r, const QColor &c)
+    {
+        QSGSimpleRectNode *n;
+        if (m_used < childCount()) {
+            n = static_cast<QSGSimpleRectNode *>(childAtIndex(m_used));
+        } else {
+            n = new QSGSimpleRectNode;
+            n->setFlag(QSGNode::OwnedByParent);
+            appendChildNode(n);
+        }
+        if (n->rect() != r)
+            n->setRect(r);
+        if (n->color() != c)
+            n->setColor(c);
+        ++m_used;
+    }
+    void end()
+    {
+        while (childCount() > m_used) {
+            QSGNode *n = lastChild();
+            removeChildNode(n);
+            delete n;
+        }
+    }
+
+private:
+    int m_used = 0;
+};
+
+// Texture quads for this frame (the overview image, or the visible zoom tiles).
+class ImageLayer : public QSGNode {
+public:
+    void begin() { m_used = 0; }
+    void add(QSGTexture *t, const QRectF &r)
+    {
+        QSGSimpleTextureNode *n;
+        if (m_used < childCount()) {
+            n = static_cast<QSGSimpleTextureNode *>(childAtIndex(m_used));
+        } else {
+            n = new QSGSimpleTextureNode;
+            n->setFlag(QSGNode::OwnedByParent);
+            n->setFiltering(QSGTexture::Linear);
+            appendChildNode(n);
+        }
+        if (n->texture() != t)
+            n->setTexture(t);
+        if (n->rect() != r)
+            n->setRect(r);
+        ++m_used;
+    }
+    void end()
+    {
+        while (childCount() > m_used) {
+            QSGNode *n = lastChild();
+            removeChildNode(n);
+            delete n;
+        }
+    }
+
+private:
+    int m_used = 0;
+};
+
+// What the cached textures were drawn for; any change redraws them.
+struct CacheKey {
+    const TrackBuffer *buffer = nullptr;
+    int rev = -1;
+    int width = 0, height = 0; // device pixels
+    QRgb color = 0;
+    double pixelsPerSec = 0.0; // zoom only
+    bool operator==(const CacheKey &) const = default;
+};
+
+class WaveNode : public QSGNode {
+public:
+    WaveNode()
+    {
+        under->setFlag(OwnedByParent);
+        images->setFlag(OwnedByParent);
+        over->setFlag(OwnedByParent);
+        appendChildNode(under);
+        appendChildNode(images);
+        appendChildNode(over);
+    }
+    ~WaveNode() override { dropTextures(); }
+
+    void dropTextures()
+    {
+        // the nodes using them are rebuilt this frame
+        images->begin();
+        images->end();
+        delete overview;
+        overview = nullptr;
+        for (const Tile &t : std::as_const(tiles))
+            delete t.texture;
+        tiles.clear();
+    }
+
+    RectLayer *under = new RectLayer;
+    ImageLayer *images = new ImageLayer;
+    RectLayer *over = new RectLayer;
+
+    CacheKey key;
+    QSGTexture *overview = nullptr;
+    struct Tile {
+        QSGTexture *texture = nullptr;
+        quint64 used = 0;
+    };
+    QHash<int, Tile> tiles;
+    quint64 frame = 0;
+};
+
+double s_renderMs = 0.0;
+
+// Whole track, peak (faint) and RMS (solid) per column.
+QImage drawOverview(const TrackBuffer *tb, int w, int h, const QColor &color)
 {
+    QImage img(w, h, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::transparent);
+    QPainter p(&img);
+    const int buckets = int(tb->peaks.size());
+    const double mid = h / 2.0;
+    QColor peakC = color;
+    peakC.setAlpha(90);
+    for (int x = 0; x < w; ++x) {
+        const int b0 = int(double(x) / w * buckets), b1 = std::max(b0 + 1, int(double(x + 1) / w * buckets));
+        float pk = 0, rm = 0;
+        for (int b = b0; b < b1 && b < buckets; ++b) {
+            pk = std::max(pk, tb->peaks[size_t(b)]);
+            rm = std::max(rm, tb->rms[size_t(b)]);
+        }
+        p.setPen(peakC);
+        p.drawLine(QPointF(x + 0.5, mid - pk * mid), QPointF(x + 0.5, mid + pk * mid));
+        p.setPen(color);
+        const double r = std::min(1.0, rm * 1.6);
+        p.drawLine(QPointF(x + 0.5, mid - r * mid), QPointF(x + 0.5, mid + r * mid));
+    }
+    return img;
+}
+
+// One stretch of the zoomed waveform, from the fine peaks: tile i starts at
+// i * kTileWidth / pixelsPerSec seconds.
+QImage drawTile(const TrackBuffer *tb, int i, int h, double pixelsPerSec, const QColor &color)
+{
+    QImage img(kTileWidth, h, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::transparent);
+    const QRgb px = qPremultiply(color.rgba());
+    const double mid = h / 2.0;
+    const double bucketsPerSec = double(tb->sampleRate) / double(TrackBuffer::kDetailFrames);
+    const int n = int(tb->detail.size());
+    const double t0 = double(i) * kTileWidth / pixelsPerSec;
+    for (int c = 0; c < kTileWidth; ++c) {
+        const double ta = t0 + c / pixelsPerSec, tb2 = t0 + (c + 1) / pixelsPerSec;
+        const int b0 = int(std::floor(ta * bucketsPerSec)), b1 = std::max(b0 + 1, int(std::ceil(tb2 * bucketsPerSec)));
+        float pk = 0;
+        for (int b = std::max(0, b0); b < std::min(n, b1); ++b)
+            pk = std::max(pk, tb->detail[size_t(b)]);
+        if (pk <= 0)
+            continue;
+        const int y0 = std::max(0, int(std::floor(mid - pk * mid * 0.95)));
+        const int y1 = std::min(h - 1, int(std::ceil(mid + pk * mid * 0.95)));
+        for (int y = y0; y <= y1; ++y)
+            reinterpret_cast<QRgb *>(img.scanLine(y))[c] = px;
+    }
+    return img;
+}
+
+} // namespace
+
+WaveformItem::WaveformItem(QQuickItem *parent)
+    : QQuickItem(parent)
+{
+    setFlag(ItemHasContents);
+    setClip(true);
     setAcceptedMouseButtons(Qt::LeftButton);
     setCursor(Qt::ArrowCursor);
-    setAntialiasing(false);
-    setOpaquePainting(false);
 }
 
 void WaveformItem::setDeck(DeckController *d)
@@ -29,11 +213,11 @@ void WaveformItem::setDeck(DeckController *d)
         connect(m_deck, &DeckController::gridChanged, this, repaint);
         connect(m_deck, &DeckController::loopChanged, this, repaint);
         connect(m_deck, &DeckController::trackChanged, this, [this] {
-            m_cacheRev = -1;
+            ++m_trackRev;
             update();
         });
     }
-    m_cacheRev = -1;
+    ++m_trackRev;
     emit deckChanged();
     update();
 }
@@ -63,62 +247,144 @@ void WaveformItem::setColor(const QColor &c)
     if (c == m_color)
         return;
     m_color = c;
-    m_cacheRev = -1;
     emit colorChanged();
     update();
 }
 
-void WaveformItem::geometryChange(const QRectF &n, const QRectF &o)
+double WaveformItem::takeRenderMs()
 {
-    QQuickPaintedItem::geometryChange(n, o);
-    m_cacheRev = -1;
-    update();
+    const double ms = s_renderMs;
+    s_renderMs = 0.0;
+    return ms;
 }
 
-void WaveformItem::paint(QPainter *p)
+// Runs on the render thread while the GUI thread waits, so reading the deck is safe.
+QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 {
-    if (!m_deck || !m_deck->buffer()) {
-        p->setPen(QColor(255, 255, 255, 30));
-        p->drawLine(QPointF(0, height() / 2), QPointF(width(), height() / 2));
-        return;
-    }
-    if (m_zoom)
-        paintZoom(p);
-    else
-        paintOverview(p);
-}
+    QElapsedTimer timer;
+    timer.start();
+    auto *node = static_cast<WaveNode *>(old);
+    if (!node)
+        node = new WaveNode;
+    ++node->frame;
 
-// ---------------------------------------------------------------- overview
-
-void WaveformItem::rebuildCache()
-{
-    const TrackBuffer *tb = m_deck->buffer();
+    const double w = width(), h = height();
     const qreal dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
-    const int w = std::max(1, int(width() * dpr)), h = std::max(1, int(height() * dpr));
-    m_cache = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
-    m_cache.fill(Qt::transparent);
-    QPainter p(&m_cache);
-    const int buckets = int(tb->peaks.size());
-    const double mid = h / 2.0;
-    QColor peakC = m_color;
-    peakC.setAlpha(90);
-    QColor rmsC = m_color;
-    for (int x = 0; x < w; ++x) {
-        const int b0 = int(double(x) / w * buckets), b1 = std::max(b0 + 1, int(double(x + 1) / w * buckets));
-        float pk = 0, rm = 0;
-        for (int b = b0; b < b1 && b < buckets; ++b) {
-            pk = std::max(pk, tb->peaks[size_t(b)]);
-            rm = std::max(rm, tb->rms[size_t(b)]);
+    const int wpx = std::max(1, int(std::round(w * dpr))), hpx = std::max(1, int(std::round(h * dpr)));
+    const TrackBuffer *tb = m_deck ? m_deck->buffer() : nullptr;
+
+    node->under->begin();
+    node->images->begin();
+    node->over->begin();
+
+    if (!tb || tb->frames() == 0 || w < 1 || h < 1) {
+        node->dropTextures();
+        node->key = {};
+        node->over->add(QRectF(0, std::floor(h / 2), w, 1), QColor(255, 255, 255, 30));
+    } else if (!m_zoom) {
+        // ---------------------------------------------------------- overview
+        const CacheKey key{tb, m_trackRev, wpx, hpx, m_color.rgba(), 0.0};
+        if (!(key == node->key) || !node->overview) {
+            node->dropTextures();
+            node->key = key;
+            node->overview = window()->createTextureFromImage(drawOverview(tb, wpx, hpx, m_color));
         }
-        p.setPen(peakC);
-        p.drawLine(QPointF(x + 0.5, mid - pk * mid), QPointF(x + 0.5, mid + pk * mid));
-        p.setPen(rmsC);
-        const double r = std::min(1.0, rm * 1.6);
-        p.drawLine(QPointF(x + 0.5, mid - r * mid), QPointF(x + 0.5, mid + r * mid));
+        node->images->add(node->overview, QRectF(0, 0, w, h));
+
+        const double dur = std::max(0.001, m_deck->duration());
+        auto xAt = [&](double sec) { return sec / dur * w; };
+        const BeatGrid g = m_deck->grid();
+        // phrase markers every 8 bars
+        if (g.valid()) {
+            const double first = std::ceil(g.beatAtSec(0) / 32.0) * 32.0;
+            for (double b = first; g.secAtBeat(b) < dur; b += 32.0)
+                node->over->add(QRectF(std::round(xAt(g.secAtBeat(b))), 0, 1, h), QColor(255, 255, 255, 28));
+        }
+        // loop region (or the one being drawn with Shift)
+        double la = m_deck->loopStartBeat(), lb = m_deck->loopEndBeat();
+        if (m_dragging) {
+            la = std::min(m_dragA, m_dragB);
+            lb = std::max(m_dragA, m_dragB);
+        }
+        if (g.valid() && lb > la) {
+            const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
+            const bool on = m_deck->loopEnabled() || m_dragging;
+            const QColor edge(255, 255, 255, on ? 170 : 60);
+            node->over->add(QRectF(x0, 0, x1 - x0, h), QColor(255, 255, 255, on ? 34 : 12));
+            node->over->add(QRectF(x0, 0, 1.5, h), edge);
+            node->over->add(QRectF(x1 - 1.5, 0, 1.5, h), edge);
+            node->over->add(QRectF(x0, 0, x1 - x0, 3), edge);
+        }
+        // played part dimmed, playhead
+        const double px = xAt(m_deck->shownPosition());
+        node->over->add(QRectF(0, 0, px, h), QColor(0, 0, 0, 110));
+        node->over->add(QRectF(px - 1, 0, 2, h), QColor(255, 255, 255));
+    } else {
+        // ---------------------------------------------------------- zoom
+        const BeatGrid g = m_deck->grid();
+        const double pos = m_deck->shownPosition();
+        const double spb = g.valid() ? g.secPerBeat() : 0.5;
+        const double span = m_zoomBeats * spb;
+        const double t0 = pos - span / 2.0;
+        const double pixelsPerSec = wpx / span;
+        auto xAt = [&](double sec) { return (sec - t0) / span * w; };
+
+        const CacheKey key{tb, m_trackRev, wpx, hpx, m_color.rgba(), pixelsPerSec};
+        if (!(key == node->key)) {
+            node->dropTextures();
+            node->key = key;
+        }
+
+        // loop region underneath
+        const double la = m_deck->loopStartBeat(), lb = m_deck->loopEndBeat();
+        if (g.valid() && lb > la) {
+            const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
+            node->under->add(QRectF(x0, 0, x1 - x0, h), QColor(255, 255, 255, m_deck->loopEnabled() ? 22 : 8));
+        }
+
+        // the tiles in view
+        const double tileSec = kTileWidth / pixelsPerSec;
+        const double dur = m_deck->duration();
+        const int iFirst = std::max(0, int(std::floor(t0 / tileSec)));
+        const int iLast = int(std::floor(std::min(t0 + span, dur) / tileSec));
+        for (int i = iFirst; i <= iLast; ++i) {
+            auto it = node->tiles.find(i);
+            if (it == node->tiles.end()) {
+                if (node->tiles.size() >= kMaxTiles) {
+                    // drop the least recently shown
+                    auto oldest = node->tiles.begin();
+                    for (auto t = node->tiles.begin(); t != node->tiles.end(); ++t)
+                        if (t->used < oldest->used)
+                            oldest = t;
+                    delete oldest->texture;
+                    node->tiles.erase(oldest);
+                }
+                it = node->tiles.insert(i, {window()->createTextureFromImage(drawTile(tb, i, hpx, pixelsPerSec, m_color)), 0});
+            }
+            it->used = node->frame;
+            node->images->add(it->texture, QRectF(xAt(i * tileSec), 0, tileSec / span * w, h));
+        }
+
+        // what has played, darker
+        node->over->add(QRectF(0, 0, w / 2, h), QColor(0, 0, 0, 100));
+        // beat grid
+        if (g.valid()) {
+            const double bFirst = std::ceil(g.beatAtSec(t0));
+            for (double b = bFirst; g.secAtBeat(b) < t0 + span; b += 1.0) {
+                const double x = xAt(g.secAtBeat(b));
+                const bool bar = std::fmod(std::fmod(b, 4.0) + 4.0, 4.0) < 0.5;
+                node->over->add(QRectF(x - (bar ? 1.0 : 0.5), 0, bar ? 2.0 : 1.0, h), QColor(255, 255, 255, bar ? 150 : 50));
+            }
+        }
+        // fixed playhead in the middle
+        node->over->add(QRectF(w / 2 - 1, 0, 2, h), QColor(255, 255, 255));
     }
-    m_cache.setDevicePixelRatio(dpr);
-    m_cacheRev = m_deck->waveformRevision();
-    m_cacheSize = size();
+
+    node->under->end();
+    node->images->end();
+    node->over->end();
+    s_renderMs += timer.nsecsElapsed() / 1e6;
+    return node;
 }
 
 double WaveformItem::secAtX(double x) const
@@ -130,105 +396,6 @@ double WaveformItem::snapBeat(double beat, bool fine) const
 {
     const double q = fine ? 1.0 : 4.0;
     return std::round(beat / q) * q;
-}
-
-void WaveformItem::paintOverview(QPainter *p)
-{
-    if (m_cacheRev != m_deck->waveformRevision() || m_cacheSize != size())
-        rebuildCache();
-    const double w = width(), h = height();
-    const double dur = std::max(0.001, m_deck->duration());
-    auto xAt = [&](double sec) { return sec / dur * w; };
-
-    p->drawImage(QRectF(0, 0, w, h), m_cache);
-
-    const BeatGrid g = m_deck->grid();
-    // phrase markers every 8 bars
-    if (g.valid()) {
-        p->setPen(QColor(255, 255, 255, 28));
-        const double first = std::ceil(g.beatAtSec(0) / 32.0) * 32.0;
-        for (double b = first; g.secAtBeat(b) < dur; b += 32.0) {
-            const double x = std::round(xAt(g.secAtBeat(b))) + 0.5;
-            p->drawLine(QPointF(x, 0), QPointF(x, h));
-        }
-    }
-
-    // loop region (or the one being dragged)
-    double la = m_deck->loopStartBeat(), lb = m_deck->loopEndBeat();
-    if (m_dragging) {
-        la = std::min(m_dragA, m_dragB);
-        lb = std::max(m_dragA, m_dragB);
-    }
-    if (g.valid() && lb > la) {
-        const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
-        const bool on = m_deck->loopEnabled() || m_dragging;
-        QColor fill(255, 255, 255, on ? 34 : 12);
-        p->fillRect(QRectF(x0, 0, x1 - x0, h), fill);
-        QColor edge(255, 255, 255, on ? 170 : 60);
-        p->fillRect(QRectF(x0, 0, 1.5, h), edge);
-        p->fillRect(QRectF(x1 - 1.5, 0, 1.5, h), edge);
-        p->fillRect(QRectF(x0, 0, x1 - x0, 3), edge);
-    }
-
-    // played part dimmed, playhead
-    const double px = xAt(m_deck->shownPosition());
-    p->fillRect(QRectF(0, 0, px, h), QColor(0, 0, 0, 110));
-    p->fillRect(QRectF(px - 1, 0, 2, h), QColor(255, 255, 255));
-}
-
-// ---------------------------------------------------------------- zoom
-
-void WaveformItem::paintZoom(QPainter *p)
-{
-    const TrackBuffer *tb = m_deck->buffer();
-    const BeatGrid g = m_deck->grid();
-    const double w = width(), h = height(), mid = h / 2.0;
-    const double pos = m_deck->shownPosition();
-    const double spb = g.valid() ? g.secPerBeat() : 0.5;
-    const double span = m_zoomBeats * spb;
-    const double t0 = pos - span / 2.0;
-    auto xAt = [&](double sec) { return (sec - t0) / span * w; };
-
-    // loop region underneath
-    const double la = m_deck->loopStartBeat(), lb = m_deck->loopEndBeat();
-    if (g.valid() && lb > la) {
-        const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
-        p->fillRect(QRectF(x0, 0, x1 - x0, h), QColor(255, 255, 255, m_deck->loopEnabled() ? 22 : 8));
-    }
-
-    // waveform from fine peaks
-    const double sr = tb->sampleRate;
-    const double bucketsPerSec = sr / double(TrackBuffer::kDetailFrames);
-    const int n = int(tb->detail.size());
-    const qreal dpr = window() ? window()->effectiveDevicePixelRatio() : 1.0;
-    const int cols = int(w * dpr);
-    QColor past = m_color.darker(170);
-    for (int c = 0; c < cols; ++c) {
-        const double ta = t0 + span * c / cols, tb2 = t0 + span * (c + 1) / cols;
-        int b0 = int(std::floor(ta * bucketsPerSec)), b1 = int(std::ceil(tb2 * bucketsPerSec));
-        float pk = 0;
-        for (int b = std::max(0, b0); b < std::min(n, std::max(b1, b0 + 1)); ++b)
-            pk = std::max(pk, tb->detail[size_t(b)]);
-        if (pk <= 0)
-            continue;
-        const double x = (c + 0.5) / dpr;
-        p->setPen(QPen(ta < pos ? past : m_color, 1.0 / dpr));
-        p->drawLine(QPointF(x, mid - pk * mid * 0.95), QPointF(x, mid + pk * mid * 0.95));
-    }
-
-    // beat grid
-    if (g.valid()) {
-        const double bFirst = std::ceil(g.beatAtSec(t0));
-        for (double b = bFirst; g.secAtBeat(b) < t0 + span; b += 1.0) {
-            const double x = xAt(g.secAtBeat(b));
-            const bool bar = std::fmod(std::fmod(b, 4.0) + 4.0, 4.0) < 0.5;
-            p->fillRect(QRectF(x - (bar ? 1.0 : 0.5), 0, bar ? 2.0 : 1.0, h),
-                        QColor(255, 255, 255, bar ? 150 : 50));
-        }
-    }
-
-    // fixed playhead in the middle
-    p->fillRect(QRectF(w / 2 - 1, 0, 2, h), QColor(255, 255, 255));
 }
 
 // ---------------------------------------------------------------- mouse

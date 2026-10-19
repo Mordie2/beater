@@ -1,8 +1,7 @@
 #pragma once
 #include <QColor>
-#include <QImage>
 #include <QPointer>
-#include <QQuickPaintedItem>
+#include <QQuickItem>
 #include <QtQml/qqmlregistration.h>
 
 class DeckController;
@@ -14,7 +13,11 @@ class DeckController;
 //  region, snapped to bars (add Alt/Option to snap to beats).
 //  Zoom mode: a window of N beats scrolling around the playhead. Drag it to
 //  move through the track the same way; the waveform follows the hand.
-class WaveformItem : public QQuickPaintedItem {
+//
+// Drawn with the scene graph: the waveform is rendered once into textures
+// (the zoom one in tiles along the track) and each frame only moves them and
+// redraws a few rectangles (grid, loop, playhead), so scrolling costs ~nothing.
+class WaveformItem : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
     Q_PROPERTY(DeckController *deck READ deck WRITE setDeck NOTIFY deckChanged)
@@ -34,7 +37,8 @@ public:
     QColor color() const { return m_color; }
     void setColor(const QColor &c);
 
-    void paint(QPainter *p) override;
+    //! Milliseconds spent building waveform frames since the last call (BEATER_FPS).
+    static double takeRenderMs();
 
 signals:
     void deckChanged();
@@ -42,15 +46,12 @@ signals:
     void colorChanged();
 
 protected:
+    QSGNode *updatePaintNode(QSGNode *old, UpdatePaintNodeData *) override;
     void mousePressEvent(QMouseEvent *e) override;
     void mouseMoveEvent(QMouseEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
-    void geometryChange(const QRectF &n, const QRectF &o) override;
 
 private:
-    void paintOverview(QPainter *p);
-    void paintZoom(QPainter *p);
-    void rebuildCache();
     double secAtX(double x) const;
     double snapBeat(double beat, bool fine) const;
 
@@ -58,10 +59,7 @@ private:
     bool m_zoom = false;
     double m_zoomBeats = 16.0;
     QColor m_color = QColor(255, 90, 54);
-
-    QImage m_cache;
-    int m_cacheRev = -1;
-    QSizeF m_cacheSize;
+    int m_trackRev = 0; // bumped when the track changes, so cached textures go
 
     bool m_pressed = false;
     bool m_dragging = false;  // overview: shift-dragging a loop
