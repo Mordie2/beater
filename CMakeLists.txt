@@ -63,6 +63,8 @@ add_library(beater_core STATIC
     src/analysis/Fft.h
     src/analysis/TempoEstimator.h
     src/analysis/TempoEstimator.cpp
+    src/analysis/KeyEstimator.h
+    src/analysis/KeyEstimator.cpp
 )
 target_include_directories(beater_core PUBLIC src)
 target_link_libraries(beater_core PUBLIC miniaudio rubberband)

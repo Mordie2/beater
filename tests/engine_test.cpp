@@ -1,8 +1,11 @@
 // Headless checks for the audio core: tempo estimate, sync/phase lock,
-// key shift, end loops. Run: ./engine_test
+// key shift, end loops, key estimate. Run: ./engine_test
+#include "analysis/KeyEstimator.h"
 #include "analysis/TempoEstimator.h"
+#include "core/Key.h"
 #include "audio/AudioEngine.h"
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <random>
@@ -48,6 +51,43 @@ static void testTempo()
         std::printf("  %.2f bpm @ %.3fs -> %.3f bpm @ %.4fs (conf %.2f)\n", c.bpm, c.first, r.bpm, r.firstBeatSec, r.confidence);
         CHECK(r.ok && std::abs(r.bpm - c.bpm) < 0.02, "bpm %.3f vs %.3f", r.bpm, c.bpm);
         CHECK(std::abs(r.firstBeatSec - c.first) < 0.012, "first beat %.4f vs %.4f", r.firstBeatSec, c.first);
+    }
+}
+
+// Chords (root, third, fifth as MIDI offsets from the key's tonic), one per
+// two bars at 124 BPM, as bright saw-ish pads with a bass root, over drums.
+static std::vector<float> chordTrack(int tonic, const std::vector<std::array<int, 3>> &chords, double seconds, uint32_t sr)
+{
+    std::vector<float> x = clickTrack(124.0, 0.2, seconds, sr);
+    const double chordSec = 8 * 60.0 / 124.0;
+    for (size_t i = 0; i < x.size(); ++i) {
+        const double t = double(i) / sr;
+        const auto &c = chords[size_t(t / chordSec) % chords.size()];
+        double v = 0.0;
+        for (int n = 0; n < 4; ++n) {
+            const int midi = n == 3 ? 36 + tonic + c[0] : 48 + tonic + c[size_t(n)];
+            const double f = 440.0 * std::pow(2.0, (midi - 69) / 12.0);
+            for (int h = 1; h <= 6; ++h)
+                v += std::sin(2 * M_PI * f * h * t) / h;
+        }
+        x[i] += float(0.06 * v);
+    }
+    return x;
+}
+
+static void testKey()
+{
+    std::printf("key estimate\n");
+    const std::vector<std::array<int, 3>> majorCad = {{0, 4, 7}, {5, 9, 12}, {7, 11, 14}, {0, 4, 7}};   // I IV V I
+    const std::vector<std::array<int, 3>> minorCad = {{0, 3, 7}, {5, 8, 12}, {7, 11, 14}, {0, 3, 7}};   // i iv V i
+    struct Case { int tonic; bool minor; } cases[] = {{9, true}, {0, false}, {6, true}, {3, false}, {2, true}};
+    for (auto c : cases) {
+        const int want = c.tonic + (c.minor ? 12 : 0);
+        auto x = chordTrack(c.tonic, c.minor ? minorCad : majorCad, 60.0, 22050);
+        KeyResult r = estimateKey(x, 22050);
+        std::printf("  %-4s -> %-4s (%s, conf %.2f)\n", keys::standardName(want).c_str(), keys::standardName(r.key).c_str(),
+                    keys::camelot(r.key).c_str(), r.confidence);
+        CHECK(r.ok && r.key == want, "key %s vs %s", keys::standardName(r.key).c_str(), keys::standardName(want).c_str());
     }
 }
 
@@ -222,6 +262,7 @@ int main()
     testTempo();
     testSync();
     testKeyShiftAndLoop();
+    testKey();
     std::printf(g_fail ? "\n%d check(s) failed\n" : "\nall checks passed\n", g_fail);
     return g_fail ? 1 : 0;
 }

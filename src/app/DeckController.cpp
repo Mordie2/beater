@@ -101,6 +101,7 @@ void DeckController::loadRecord(const TrackRecord &rec)
 
         emit trackChanged();
         emit gridChanged();
+        emit analyzingChanged();
         emit keyChanged();
         emit loopChanged();
         emit positionChanged();
@@ -114,7 +115,9 @@ void DeckController::refreshFromLibrary(const QString &id)
         return;
     const TrackRecord r = m_library->record(id);
     const bool gridDiff = r.bpm != m_rec.bpm || r.firstBeatSec != m_rec.firstBeatSec;
-    const bool keyDiff = r.key != m_rec.key;
+    const bool manualDiff = r.gridManual != m_rec.gridManual;
+    const bool keyDiff = r.key != m_rec.key || r.keyManual != m_rec.keyManual;
+    const bool statusDiff = r.status != m_rec.status;
     const bool loopDiff = r.loopStartBeat != m_rec.loopStartBeat || r.loopEndBeat != m_rec.loopEndBeat;
     const bool titleDiff = r.title != m_rec.title;
     m_rec = r;
@@ -128,8 +131,12 @@ void DeckController::refreshFromLibrary(const QString &id)
         sendLoop();
         emit loopChanged();
     }
+    if (manualDiff && !gridDiff)
+        emit gridChanged();
     if (keyDiff)
         emit keyChanged();
+    if (statusDiff)
+        emit analyzingChanged();
     if (titleDiff)
         emit trackChanged();
 }
@@ -332,7 +339,19 @@ void DeckController::nudgeGrid(double ms)
     emit loopChanged();
 }
 
+void DeckController::autoGrid()
+{
+    if (!m_rec.id.isEmpty())
+        m_library->autoDetect(m_rec.id, true, false);
+}
+
 // ---------------------------------------------------------------- key
+
+void DeckController::autoKey()
+{
+    if (!m_rec.id.isEmpty())
+        m_library->autoDetect(m_rec.id, false, true);
+}
 
 void DeckController::setKey(int key)
 {

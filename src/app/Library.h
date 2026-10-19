@@ -43,7 +43,9 @@ public:
     Q_INVOKABLE void addUrls(const QList<QUrl> &urls);
     Q_INVOKABLE void removeAt(int row);
     Q_INVOKABLE void move(int from, int to);
-    Q_INVOKABLE void reanalyze(int row);
+    Q_INVOKABLE void reanalyze(int row); // keeps manual edits
+    // Drops the manual grid and/or key and detects them again.
+    void autoDetect(const QString &id, bool grid, bool key);
     Q_INVOKABLE QString idAt(int row) const;
 
     bool contains(const QString &id) const { return m_tracks.contains(id); }

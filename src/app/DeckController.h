@@ -33,9 +33,11 @@ class DeckController : public QObject {
     Q_PROPERTY(double bpm READ bpm NOTIFY gridChanged)
     Q_PROPERTY(double firstBeat READ firstBeat NOTIFY gridChanged)
     Q_PROPERTY(bool gridManual READ gridManual NOTIFY gridChanged)
+    Q_PROPERTY(bool analyzing READ analyzing NOTIFY analyzingChanged)
     Q_PROPERTY(double playingBpm READ playingBpm NOTIFY playingBpmChanged)
 
     Q_PROPERTY(int key READ key NOTIFY keyChanged)
+    Q_PROPERTY(bool keyManual READ keyManual NOTIFY keyChanged)
     Q_PROPERTY(int keyShift READ keyShift WRITE setKeyShift NOTIFY keyChanged)
     Q_PROPERTY(QString keyText READ keyText NOTIFY keyChanged)
     Q_PROPERTY(QString shiftedKeyText READ shiftedKeyText NOTIFY keyChanged)
@@ -71,9 +73,11 @@ public:
     double bpm() const { return m_rec.bpm; }
     double firstBeat() const { return m_rec.firstBeatSec; }
     bool gridManual() const { return m_rec.gridManual; }
+    bool analyzing() const { return m_rec.status == QLatin1String("analyzing"); }
     double playingBpm() const { return m_playingBpm; }
 
     int key() const { return m_rec.key; }
+    bool keyManual() const { return m_rec.keyManual; }
     int keyShift() const { return m_keyShift; }
     void setKeyShift(int st);
     QString keyText() const;
@@ -113,9 +117,11 @@ public:
     Q_INVOKABLE void tap();
     Q_INVOKABLE void setDownbeatHere();
     Q_INVOKABLE void nudgeGrid(double ms);
+    Q_INVOKABLE void autoGrid(); // drop the manual grid, detect it again
 
     // key
     Q_INVOKABLE void setKey(int key);
+    Q_INVOKABLE void autoKey(); // drop the manual key, detect it again
     Q_INVOKABLE QStringList keyNames() const; // 24 entries, index = key
 
     // loops (beats on the track grid)
@@ -136,6 +142,7 @@ signals:
     void playingChanged();
     void levelChanged();
     void gridChanged();
+    void analyzingChanged();
     void playingBpmChanged();
     void keyChanged();
     void syncChanged();

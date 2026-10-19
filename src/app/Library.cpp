@@ -1,5 +1,6 @@
 #include "app/Library.h"
 
+#include "analysis/KeyEstimator.h"
 #include "analysis/TempoEstimator.h"
 #include "audio/Decoder.h"
 #include "core/Key.h"
@@ -52,7 +53,7 @@ Library::Library(QObject *parent)
     connect(&m_saveTimer, &QTimer::timeout, this, &Library::save);
     load();
     for (const QString &id : std::as_const(m_playlist))
-        if (!m_tracks[id].analyzed)
+        if (m_tracks[id].needsAnalysis())
             analyze(id);
 }
 
@@ -149,7 +150,7 @@ void Library::addFile(const QString &path)
     m_playlist.append(id);
     endInsertRows();
     emit countChanged();
-    if (!r.analyzed)
+    if (r.needsAnalysis())
         analyze(id);
     scheduleSave();
 }
@@ -180,9 +181,18 @@ void Library::reanalyze(int row)
     const QString id = idAt(row);
     if (id.isEmpty())
         return;
+    analyze(id);
+}
+
+void Library::autoDetect(const QString &id, bool grid, bool key)
+{
+    if (!m_tracks.contains(id))
+        return;
     TrackRecord r = m_tracks[id];
-    r.gridManual = false;
-    r.analyzed = false;
+    if (grid)
+        r.gridManual = false;
+    if (key)
+        r.keyManual = false;
     update(r);
     analyze(id);
 }
@@ -220,6 +230,7 @@ void Library::analyze(const QString &id)
     const int row = rowOf(id);
     if (row >= 0)
         emit dataChanged(index(row), index(row));
+    emit recordChanged(id);
 
     const QString path = r.path;
     m_pool.start([this, id, path] {
@@ -227,13 +238,15 @@ void Library::analyze(const QString &id)
         std::vector<float> mono;
         std::string err;
         TempoResult tr;
+        KeyResult kr;
         double duration = 0.0;
         const bool ok = decoder::decodeMono(path.toStdString(), kSr, mono, &err);
         if (ok) {
             duration = double(mono.size()) / kSr;
             tr = estimateTempo(mono, kSr);
+            kr = estimateKey(mono, kSr);
         }
-        QMetaObject::invokeMethod(this, [this, id, ok, err, tr, duration] {
+        QMetaObject::invokeMethod(this, [this, id, ok, err, tr, kr, duration] {
             --m_analyzing;
             emit analyzingCountChanged();
             if (!m_tracks.contains(id))
@@ -245,10 +258,15 @@ void Library::analyze(const QString &id)
             } else {
                 r.durationSec = duration;
                 r.analyzed = true;
+                r.analysisVersion = kAnalysisVersion;
                 if (!r.gridManual && tr.ok) {
                     r.bpm = tr.bpm;
                     r.firstBeatSec = tr.firstBeatSec;
                     r.gridConfidence = tr.confidence;
+                }
+                if (!r.keyManual && kr.ok) {
+                    r.key = kr.key;
+                    r.keyConfidence = kr.confidence;
                 }
             }
             update(r);
