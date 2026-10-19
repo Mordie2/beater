@@ -5,11 +5,22 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// stopped, and not by us: the device went away
+void deviceNotification(const ma_device_notification *n)
+{
+    if (n->type == ma_device_notification_type_stopped)
+        static_cast<AudioEngine *>(n->pDevice->pUserData)->deviceStopped();
+}
+} // namespace
+
 AudioEngine::AudioEngine() = default;
 
 AudioEngine::~AudioEngine()
 {
     stop();
+    if (m_context)
+        ma_context_uninit(m_context.get());
     collectGarbage();
 }
 
@@ -25,32 +36,92 @@ void AudioEngine::initOffline(uint32_t sampleRate)
     createDecks();
 }
 
-bool AudioEngine::start(std::string *error)
+bool AudioEngine::ensureContext()
+{
+    if (m_context)
+        return true;
+    m_context = std::make_unique<ma_context>();
+    if (ma_context_init(nullptr, 0, nullptr, m_context.get()) != MA_SUCCESS) {
+        m_context.reset();
+        return false;
+    }
+    return true;
+}
+
+std::vector<std::string> AudioEngine::outputDevices()
+{
+    std::vector<std::string> names;
+    ma_device_info *infos = nullptr;
+    ma_uint32 count = 0;
+    if (!ensureContext() || ma_context_get_devices(m_context.get(), &infos, &count, nullptr, nullptr) != MA_SUCCESS)
+        return names;
+    for (ma_uint32 i = 0; i < count; ++i) {
+        if (infos[i].isDefault)
+            names.insert(names.begin(), infos[i].name);
+        else
+            names.emplace_back(infos[i].name);
+    }
+    return names;
+}
+
+bool AudioEngine::start(const std::string &deviceName, std::string *error)
 {
     if (m_running)
         return true;
+    if (!ensureContext()) {
+        if (error)
+            *error = "Could not start Core Audio";
+        return false;
+    }
+    // find the device by name (the ids are opaque)
+    ma_device_id id{};
+    bool haveId = false;
+    if (!deviceName.empty()) {
+        ma_device_info *infos = nullptr;
+        ma_uint32 count = 0;
+        if (ma_context_get_devices(m_context.get(), &infos, &count, nullptr, nullptr) == MA_SUCCESS) {
+            for (ma_uint32 i = 0; i < count && !haveId; ++i) {
+                if (deviceName == infos[i].name) {
+                    id = infos[i].id;
+                    haveId = true;
+                }
+            }
+        }
+        if (!haveId) {
+            if (error)
+                *error = "\"" + deviceName + "\" is not connected";
+            return false;
+        }
+    }
+
+    const bool firstOpen = !m_decks[0];
     m_device = std::make_unique<ma_device>();
     ma_device_config cfg = ma_device_config_init(ma_device_type_playback);
+    cfg.playback.pDeviceID = haveId ? &id : nullptr;
     cfg.playback.format = ma_format_f32;
     cfg.playback.channels = 2;
-    cfg.sampleRate = 0; // device native
+    cfg.sampleRate = firstOpen ? 0 : m_sr; // native at first, then keep the engine's rate
     cfg.periodSizeInFrames = 512;
     cfg.dataCallback = &AudioEngine::dataCallback;
+    cfg.notificationCallback = &deviceNotification;
     cfg.pUserData = this;
     cfg.noPreSilencedOutputBuffer = MA_FALSE;
     cfg.noClip = MA_FALSE;
 
-    if (ma_device_init(nullptr, &cfg, m_device.get()) != MA_SUCCESS) {
+    if (ma_device_init(m_context.get(), &cfg, m_device.get()) != MA_SUCCESS) {
         if (error)
             *error = "Could not open the audio output device";
         m_device.reset();
         return false;
     }
-    m_sr = m_device->sampleRate;
+    if (firstOpen) {
+        m_sr = m_device->sampleRate;
+        createDecks();
+    }
     char name[256] = {};
     if (ma_device_get_name(m_device.get(), ma_device_type_playback, name, sizeof(name), nullptr) == MA_SUCCESS)
         m_deviceName = name;
-    createDecks();
+    m_lost = false;
     if (ma_device_start(m_device.get()) != MA_SUCCESS) {
         if (error)
             *error = "Could not start the audio output device";
@@ -65,11 +136,20 @@ bool AudioEngine::start(std::string *error)
 void AudioEngine::stop()
 {
     if (m_device) {
+        m_stopping = true;
         ma_device_uninit(m_device.get());
         m_device.reset();
+        m_stopping = false;
     }
     m_running = false;
 }
+
+bool AudioEngine::switchDevice(const std::string &deviceName, std::string *error)
+{
+    stop();
+    return start(deviceName, error);
+}
+
 
 void AudioEngine::post(int deck, const DeckCommand &cmd)
 {

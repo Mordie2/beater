@@ -6,7 +6,7 @@ Item {
     id: root
     required property AppController app
     signal performRequested()
-    implicitHeight: Theme.s(58)
+    implicitHeight: Theme.s(64)
 
     RowLayout {
         anchors.fill: parent
@@ -76,13 +76,33 @@ Item {
 
         Item { Layout.fillWidth: true }
 
-        ParamText {
-            text: root.app.audioStatus
-            tone: "faint"
-            color: root.app.audioOk ? Theme.textFaint : Look.warn
-            wrapMode: Text.NoWrap
-            elide: Text.ElideLeft
-            Layout.maximumWidth: Theme.s(240)
+        Column {
+            spacing: Theme.s(4)
+            Layout.preferredWidth: Theme.s(230)
+            ParamText { text: "output"; caps: true; wrapMode: Text.NoWrap }
+            ParamCombo {
+                width: parent.width
+                model: root.app.outputDevices
+                currentIndex: root.app.outputDevices.indexOf(root.app.outputDevice.length ? root.app.outputDevice : "System default")
+                onActivated: i => root.app.outputDevice = root.app.outputDevices[i]
+            }
+            ParamText {
+                // the device in use and its rate, or what went wrong
+                width: parent.width
+                text: root.app.audioStatus
+                small: true
+                tone: "faint"
+                color: root.app.audioOk ? Theme.textFaint : Look.warn
+                wrapMode: Text.NoWrap
+                elide: Text.ElideRight
+            }
+        }
+        // devices come and go (an interface plugged in): keep the list current
+        Timer {
+            interval: 3000
+            running: root.visible
+            repeat: true
+            onTriggered: root.app.refreshOutputs()
         }
     }
 }

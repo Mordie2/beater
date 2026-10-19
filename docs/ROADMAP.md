@@ -28,5 +28,5 @@
 
 ## Later
 - Ableton Link so Resolume follows the master tempo
-- Output device picker, headphone cue on a second output pair
+- Headphone cue on a second output pair (the output picker is in)
 - EQ / filter per deck

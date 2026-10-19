@@ -13,17 +13,11 @@ AppController::AppController(QObject *parent)
     m_masterVolume = s.value("masterVolume", 0.85).toDouble();
     m_phaseMode = s.value("phaseMode", 0).toInt();
 
-    std::string err;
-    if (m_engine->start(&err)) {
-        m_audioOk = true;
-        m_audioStatus = QStringLiteral("%1 · %2 kHz")
-                            .arg(QString::fromStdString(m_engine->deviceName()))
-                            .arg(m_engine->sampleRate() / 1000.0, 0, 'f', 1);
-    } else {
-        // Keep the UI usable without a device (decks won't make sound).
-        m_engine->initOffline(48000);
-        m_audioStatus = QString::fromStdString(err);
-    }
+    m_output = s.value("outputDevice").toString();
+    openOutput();
+    if (!m_engine->ready())
+        m_engine->initOffline(48000); // no device at all: the UI still works, silently
+    refreshOutputs();
     m_engine->setMasterBpm(m_masterBpm);
     m_engine->setMasterVolume(float(m_masterVolume * m_masterVolume));
     m_engine->setPhaseMode(PhaseMode(m_phaseMode));
@@ -52,9 +46,88 @@ AppController::~AppController()
     m_engine->stop();
 }
 
+
+void AppController::setStatus(bool ok, const QString &text)
+{
+    m_audioOk = ok;
+    m_audioStatus = text;
+    emit audioStatusChanged();
+}
+
+void AppController::openOutput()
+{
+    const auto rate = [this] {
+        return QStringLiteral("%1 · %2 kHz")
+            .arg(QString::fromStdString(m_engine->deviceName()))
+            .arg(m_engine->sampleRate() / 1000.0, 0, 'f', 1);
+    };
+    std::string err;
+    if (m_engine->switchDevice(m_output.toStdString(), &err)) {
+        setStatus(true, rate());
+        return;
+    }
+    // the chosen one isn't there: play through the default meanwhile
+    if (!m_output.isEmpty()) {
+        const QString why = QString::fromStdString(err);
+        if (m_engine->switchDevice({}, &err)) {
+            setStatus(false, why + QStringLiteral(" · using ") + rate());
+            return;
+        }
+    }
+    setStatus(false, QString::fromStdString(err));
+}
+
+void AppController::setOutputDevice(const QString &name)
+{
+    const QString n = name == QLatin1String("System default") ? QString() : name;
+    if (n == m_output && m_audioOk)
+        return;
+    m_output = n;
+    QSettings().setValue("outputDevice", m_output);
+    openOutput();
+}
+
+void AppController::refreshOutputs()
+{
+    QStringList l{QStringLiteral("System default")};
+    for (const std::string &n : m_engine->outputDevices())
+        l << QString::fromStdString(n);
+    if (l != m_outputs) {
+        m_outputs = l;
+        emit outputDevicesChanged();
+        // the chosen device is back (plugged in again): use it
+        if (!m_output.isEmpty() && !m_audioOk && m_outputs.contains(m_output))
+            openOutput();
+    }
+}
+
 void AppController::tick()
 {
     m_engine->collectGarbage();
+    // The device went away (unplugged): carry on through the default, and
+    // come back to the chosen one when it returns (see refreshOutputs).
+    if (m_engine->deviceLost()) {
+        const QString lost = QString::fromStdString(m_engine->deviceName());
+        std::string err;
+        if (m_engine->switchDevice({}, &err))
+            setStatus(false, lost + QStringLiteral(" went away · using ")
+                                 + QString::fromStdString(m_engine->deviceName()));
+        else
+            setStatus(false, QString::fromStdString(err));
+    }
+    // Watchdog: a device that says it runs but whose clock has stood still
+    // for 1.5 s (Core Audio rerouting under us...) gets opened again.
+    const double beat = m_engine->masterBeat();
+    if (beat != m_lastBeat || !m_engine->running()) {
+        m_lastBeat = beat;
+        m_beatStill.start();
+    } else if (m_beatStill.elapsed() > 1500) {
+        const QString name = QString::fromStdString(m_engine->deviceName());
+        openOutput();
+        if (m_audioOk)
+            setStatus(false, name + QStringLiteral(" stalled · reopened · ") + QString::fromStdString(m_engine->deviceName()));
+        m_beatStill.start();
+    }
     for (auto &d : m_decks)
         d->poll();
     m_masterBeat = m_engine->masterBeat();

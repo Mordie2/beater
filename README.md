@@ -61,6 +61,11 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
   shows all three (in use solid, armed half lit, off dim): drag an end to resize, the middle
   to move, the empty lane to draw an In / Out loop (Shift-drag on the timeline does too);
   double-click a loop to reset it. Snaps to bars, hold Option for beats.
+- **Output**: OUTPUT at the top right (Edit mode) picks the audio device: System default or
+  any output by name; remembered. Switching is live (~60 ms gap, decks keep playing; the
+  engine keeps its rate and miniaudio converts). If the device goes away the app plays
+  through the default meanwhile and goes back when it returns; a device whose clock stalls
+  is reopened.
 - **Keys** show as names (F#m) by default; KEYS at the top switches to Camelot (11A). LOOP toggles looping on the deck.
 - **Volume**: a fader per deck plus master. No automatic transitions.
 - **Analysis**: BPM, beat grid and key are detected on import (tracks analyzed by an older

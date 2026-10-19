@@ -4,6 +4,7 @@
 #include "audio/AudioEngine.h"
 
 #include <QObject>
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QUrl>
 #include <QtQml/qqmlregistration.h>
@@ -22,6 +23,10 @@ class AppController : public QObject {
     Q_PROPERTY(double masterLevel READ masterLevel NOTIFY masterBeatChanged)
     Q_PROPERTY(QString audioStatus READ audioStatus NOTIFY audioStatusChanged)
     Q_PROPERTY(bool audioOk READ audioOk NOTIFY audioStatusChanged)
+    // Output devices: "System default" first, then each by name. outputDevice
+    // is the chosen one ("" = system default); remembered.
+    Q_PROPERTY(QStringList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
+    Q_PROPERTY(QString outputDevice READ outputDevice WRITE setOutputDevice NOTIFY audioStatusChanged)
     Q_PROPERTY(DeckController *deckA READ deckA CONSTANT)
     Q_PROPERTY(DeckController *deckB READ deckB CONSTANT)
     Q_PROPERTY(Library *library READ library CONSTANT)
@@ -40,6 +45,10 @@ public:
     double masterLevel() const { return m_masterLevel; }
     QString audioStatus() const { return m_audioStatus; }
     bool audioOk() const { return m_audioOk; }
+    QStringList outputDevices() const { return m_outputs; }
+    QString outputDevice() const { return m_output; }
+    void setOutputDevice(const QString &name);
+    Q_INVOKABLE void refreshOutputs();
 
     DeckController *deckA() const { return m_decks[0].get(); }
     DeckController *deckB() const { return m_decks[1].get(); }
@@ -57,9 +66,12 @@ signals:
     void phaseModeChanged();
     void masterBeatChanged();
     void audioStatusChanged();
+    void outputDevicesChanged();
 
 private:
     void tick();
+    void openOutput(); // the chosen device, else the system default
+    void setStatus(bool ok, const QString &text);
 
     std::unique_ptr<AudioEngine> m_engine;
     std::unique_ptr<Library> m_library;
@@ -73,4 +85,8 @@ private:
     double m_masterLevel = 0.0;
     QString m_audioStatus;
     bool m_audioOk = false;
+    QStringList m_outputs;
+    QString m_output;
+    double m_lastBeat = -1.0;    // watchdog: the audio clock must keep moving
+    QElapsedTimer m_beatStill;
 };
