@@ -11,6 +11,8 @@ ParamPlate {
     property color accent: Look.deckA
 
     implicitHeight: col.implicitHeight + 2 * Theme.s(8)
+    //! The width it needs with nothing cut (the title elides).
+    readonly property real minWidth: col.implicitWidth + 2 * Theme.s(8)
 
     function fmt(s) {
         if (!(s > 0)) return "0:00"

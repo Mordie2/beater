@@ -15,8 +15,9 @@ ApplicationWindow {
     visible: true
     title: "beater"
     color: Theme.page
-    minimumWidth: perform ? Theme.s(360) : Theme.s(1100)
-    minimumHeight: perform ? Theme.s(480) : 720
+    // never smaller than the view needs to show everything uncut
+    minimumWidth: view.item ? Math.ceil(view.item.minWidth) : Theme.s(360)
+    minimumHeight: view.item ? Math.ceil(view.item.minHeight) : Theme.s(480)
     flags: (perform && prefs.onTop ? (Qt.Window | Qt.WindowStaysOnTopHint) : Qt.Window)
            | (inert ? (Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus) : 0)
 
@@ -58,6 +59,7 @@ ApplicationWindow {
     }
 
     Loader {
+        id: view
         anchors.fill: parent
         sourceComponent: window.perform ? performView : editView
     }

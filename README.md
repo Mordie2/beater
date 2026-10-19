@@ -25,7 +25,7 @@ Files or folders passed on the command line are added to the playlist. Debug hoo
 Qt's test data folders instead of the real library (and the window ignores real clicks), `BEATER_AUTOPLAY=1` loads rows 1 and 2 into
 decks A and B, plays them and logs deck state, and `BEATER_SNAPSHOT=out.png` saves
 a grab of the window after a few seconds and quits, `BEATER_MODE=perform|edit` starts in
-that mode, `BEATER_FPS=1` logs frames per second and the time spent building waveform frames.
+that mode, `BEATER_FPS=1` logs frames per second and the time spent building waveform frames. `BEATER_SIZE=WxH` starts at that window size (never below the minimum).
 
 ## How it works
 
@@ -39,6 +39,9 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
 - **Master tempo** is a fixed BPM you set (drag the number, scroll, ±, or double-click to type). Everything follows it.
 - **Sync** is on by default for each deck. A synced deck is time-stretched to the master tempo and phase-locked to the master grid (Rubber Band R3 engine, so pitch is untouched). Pressing play starts the deck immediately, already in phase: it jumps to the nearest position whose beat (or bar, with PHASE = BAR) matches the master.
 - **Key shift** in semitones, tempo stays locked. The key readout follows.
+- **Nothing is ever cut off**: when a deck's row doesn't fit, its least needed pieces drop
+  out (the playing BPM, the shift reset, the labels, key Auto, ×2 / ÷2, in that order), and
+  the window can't be made smaller than what's left needs, in either mode.
 - **A deck (Edit)**: the track, the big waveform, the timeline with the loop lane and its
   tags, then one row: Play, Sync, In / Out / Loop, the loop length, the track's BPM (and
   the BPM it plays at), ×2 / ÷2, key, key shift, and the pencil. Beneath it is space kept

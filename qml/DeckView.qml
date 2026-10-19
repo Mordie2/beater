@@ -15,8 +15,43 @@ Panel {
     property color accent: Look.deckA
     //! Editing the grid, BPM and key (the pencil).
     property bool gridEdit: false
-    //! A narrower deck: the row drops the playing BPM and the shift reset.
-    readonly property bool tight: width < Theme.s(1180)
+    // ---- the row never cuts: when it doesn't fit, pieces drop out in this
+    // order, and the deck is never narrower than what's left (minWidth).
+    // A dropped piece collapses to nothing (zero width, transparent) rather
+    // than hiding: a hidden kit button reports a smaller natural width, which
+    // the fit below reads (it would loop).
+    readonly property var dropOrder: [playingBpm, shiftReset, shiftLabel, keyAuto, bpmLabel, halveButton, doubleButton]
+    function dropped(item) { return dropOrder.indexOf(item) < dropLevel }
+    // What a piece takes laid out, shown or not (a nested row: its pieces and spacing).
+    function natural(it) {
+        if (it.layoutDirection !== undefined) {
+            let sum = 0
+            for (let i = 0; i < it.children.length; ++i)
+                sum += natural(it.children[i])
+            return sum + Math.max(0, it.children.length - 1) * it.spacing
+        }
+        return it.Layout.preferredWidth > 0 ? it.Layout.preferredWidth : it.implicitWidth
+    }
+    readonly property real fullRowWidth: natural(playRow) + Theme.s(2)
+    readonly property int dropLevel: {
+        let need = fullRowWidth, level = 0
+        while (need > rowBox.width && level < dropOrder.length) {
+            need -= natural(dropOrder[level])
+            ++level
+        }
+        return level
+    }
+    readonly property real minRowWidth: {
+        let least = fullRowWidth
+        for (const it of dropOrder)
+            least -= natural(it)
+        return least
+    }
+    //! The narrowest this deck can be with nothing cut (Edit mode's minimum width).
+    readonly property real minWidth: Math.max(minRowWidth, natural(gridRow) - natural(gridHint) - Theme.s(14))
+                                     + 2 * Theme.sectionInset
+    //! Its lowest height.
+    readonly property real minHeight: column.implicitHeight + 2 * Theme.s(12)
 
     function fmt(s) {
         if (!(s > 0)) return "0:00"
@@ -37,6 +72,7 @@ Panel {
     component Btn: ParamButton { horizontalPadding: Theme.s(8) }
 
     ColumnLayout {
+        id: column
         anchors.fill: parent
         spacing: Theme.s(8)
 
@@ -127,11 +163,13 @@ Panel {
 
         // ---- one row: playing, or (pencil) editing the grid ----
         Item {
+            id: rowBox
             Layout.fillWidth: true
             implicitHeight: Theme.s(30)
 
             // playing: transport · sync · in / out · length · tempo · key · shift
             RowLayout {
+                id: playRow
                 anchors.fill: parent
                 visible: !root.gridEdit
                 spacing: Theme.s(4)
@@ -196,7 +234,12 @@ Panel {
                 RowLayout {
                     property color accent: Look.tempo
                     spacing: Theme.s(4)
-                    Label { text: root.deck.analyzing ? "bpm …" : root.deck.gridManual ? "bpm *" : "bpm"; color: Look.label(Look.tempo) }
+                    Label {
+                        id: bpmLabel
+                        Layout.maximumWidth: root.dropped(bpmLabel) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(bpmLabel) ? 0 : (enabled ? 1 : 0.4)
+                        text: root.deck.analyzing ? "bpm …" : root.deck.gridManual ? "bpm *" : "bpm"
+                        color: Look.label(Look.tempo)
+                    }
                     ParamValueBox {
                         // click to type, Up / Down step 0.01 (Shift 1)
                         visible: root.deck.bpm > 0
@@ -210,15 +253,18 @@ Panel {
                         onStepped: (d, big) => root.deck.setBpm(root.deck.bpm + d * (big ? 1 : 0.01))
                     }
                     ParamText {
-                        visible: !root.tight
+                        // the BPM it plays at; as wide as its widest value, so it never cuts
+                        id: playingBpm
+                        Layout.maximumWidth: root.dropped(playingBpm) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(playingBpm) ? 0 : (enabled ? 1 : 0.4)
                         text: root.deck.playingBpm > 0 ? "→ " + root.deck.playingBpm.toFixed(2) : ""
                         color: Look.tempo
                         mono: true
                         wrapMode: Text.NoWrap
-                        Layout.preferredWidth: Theme.s(58)
+                        Layout.preferredWidth: widest.width
+                        TextMetrics { id: widest; font: playingBpm.font; text: "→ 000.00" }
                     }
-                    Btn { text: "×2"; enabled: root.deck.bpm > 0; onClicked: root.deck.doubleBpm() }
-                    Btn { text: "÷2"; enabled: root.deck.bpm > 0; onClicked: root.deck.halveBpm() }
+                    Btn { id: doubleButton; Layout.maximumWidth: root.dropped(doubleButton) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(doubleButton) ? 0 : (enabled ? 1 : 0.4); text: "×2"; enabled: root.deck.bpm > 0; onClicked: root.deck.doubleBpm() }
+                    Btn { id: halveButton; Layout.maximumWidth: root.dropped(halveButton) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(halveButton) ? 0 : (enabled ? 1 : 0.4); text: "÷2"; enabled: root.deck.bpm > 0; onClicked: root.deck.halveBpm() }
                 }
                 Gap {}
                 RowLayout {
@@ -232,9 +278,9 @@ Panel {
                         currentIndex: root.deck.key
                         onActivated: i => root.deck.setKey(i)
                     }
-                    Btn { text: "Auto"; enabled: root.deck.keyManual && !root.deck.analyzing; onClicked: root.deck.autoKey() }
+                    Btn { id: keyAuto; Layout.maximumWidth: root.dropped(keyAuto) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(keyAuto) ? 0 : (enabled ? 1 : 0.4); text: "Auto"; enabled: root.deck.keyManual && !root.deck.analyzing; onClicked: root.deck.autoKey() }
                     Gap {}
-                    Label { text: "shift"; color: Look.label(Look.key) }
+                    Label { id: shiftLabel; Layout.maximumWidth: root.dropped(shiftLabel) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(shiftLabel) ? 0 : (enabled ? 1 : 0.4); text: "shift"; color: Look.label(Look.key) }
                     Btn { text: "−"; implicitWidth: Theme.s(26); enabled: root.deck.keyShift > -12; onClicked: root.deck.keyShift = root.deck.keyShift - 1 }
                     ParamValueBox {
                         Layout.alignment: Qt.AlignVCenter
@@ -245,7 +291,7 @@ Panel {
                         onStepped: (d, big) => root.deck.keyShift = root.deck.keyShift + d * (big ? 12 : 1)
                     }
                     Btn { text: "+"; implicitWidth: Theme.s(26); enabled: root.deck.keyShift < 12; onClicked: root.deck.keyShift = root.deck.keyShift + 1 }
-                    Btn { visible: !root.tight; text: "0"; implicitWidth: Theme.s(26); enabled: root.deck.keyShift !== 0; onClicked: root.deck.keyShift = 0 }
+                    Btn { id: shiftReset; Layout.maximumWidth: root.dropped(shiftReset) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(shiftReset) ? 0 : (enabled ? 1 : 0.4); text: "0"; implicitWidth: Theme.s(26); enabled: root.deck.keyShift !== 0; onClicked: root.deck.keyShift = 0 }
                 }
                 Item { Layout.fillWidth: true }
                 RowLayout {
@@ -262,6 +308,7 @@ Panel {
 
             // editing: the track's BPM and grid, and its key
             RowLayout {
+                id: gridRow
                 anchors.fill: parent
                 visible: root.gridEdit
                 spacing: Theme.s(4)
@@ -306,11 +353,13 @@ Panel {
                     Btn { text: "Auto"; enabled: root.deck.keyManual && !root.deck.analyzing; onClicked: root.deck.autoKey() }
                 }
                 ParamText {
+                    // shown only when it fits whole
+                    id: gridHint
                     text: "drag the waveform to move the grid · double-click a beat to make it the 1"
                     tone: "faint"
                     small: true
                     wrapMode: Text.NoWrap
-                    elide: Text.ElideRight
+                    opacity: width >= implicitWidth ? 1 : 0
                     Layout.fillWidth: true
                     Layout.leftMargin: Theme.s(10)
                 }

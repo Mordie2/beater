@@ -9,14 +9,19 @@ Item {
     required property AppController app
     property bool onTop: false
     signal editRequested()
+    //! The smallest window that shows everything uncut.
+    readonly property real minWidth: 2 * Theme.s(8) + Math.max(header.implicitWidth, deckA.minWidth, deckB.minWidth)
+    readonly property real minHeight: 2 * Theme.s(8) + column.implicitHeight + Theme.s(120)
     signal onTopToggled(bool on)
 
     ColumnLayout {
+        id: column
         anchors.fill: parent
         anchors.margins: Theme.s(8)
         spacing: Theme.s(8)
 
         RowLayout {
+            id: header
             spacing: Theme.s(8)
             MasterTempo {
                 // sky: tempo
@@ -45,12 +50,14 @@ Item {
         }
 
         PerformDeck {
+            id: deckA
             app: root.app
             deck: root.app.deckA
             accent: Look.deckA
             Layout.fillWidth: true
         }
         PerformDeck {
+            id: deckB
             app: root.app
             deck: root.app.deckB
             accent: Look.deckB

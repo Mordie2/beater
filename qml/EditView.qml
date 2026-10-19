@@ -8,6 +8,11 @@ Item {
     id: root
     required property AppController app
     signal performRequested()
+    //! The smallest window that shows everything uncut.
+    readonly property real minWidth: 2 * Theme.s(12) + Math.max(topBar.minWidth, deckA.minWidth + Theme.s(12) + Theme.s(300))
+    readonly property real minHeight: 2 * Theme.s(12) + topBar.implicitHeight + Theme.s(12)
+                                      + Math.max(deckA.minHeight + deckB.minHeight + Theme.s(12),
+                                                 mix.implicitHeight + Theme.s(12) + Theme.s(160))
 
     ColumnLayout {
         anchors.fill: parent
@@ -15,6 +20,7 @@ Item {
         spacing: Theme.s(12)
 
         TopBar {
+            id: topBar
             app: root.app
             Layout.fillWidth: true
             onPerformRequested: root.performRequested()
@@ -31,9 +37,10 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.preferredWidth: 1
-                Layout.minimumWidth: Theme.s(640)
+                Layout.minimumWidth: deckA.minWidth
                 spacing: Theme.s(12)
                 DeckView {
+                    id: deckA
                     app: root.app
                     deck: root.app.deckA
                     accent: Look.deckA
@@ -42,6 +49,7 @@ Item {
                     Layout.preferredHeight: 1
                 }
                 DeckView {
+                    id: deckB
                     app: root.app
                     deck: root.app.deckB
                     accent: Look.deckB
@@ -57,6 +65,7 @@ Item {
                 Layout.fillHeight: true
                 spacing: Theme.s(12)
                 MixView {
+                    id: mix
                     app: root.app
                     Layout.fillWidth: true
                 }

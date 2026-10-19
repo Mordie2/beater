@@ -18,6 +18,7 @@
 //  BEATER_SNAPSHOT=x.png  save a grab of the window after a few seconds, then quit
 //  BEATER_MODE=perform    start in perform (or edit) mode
 //  BEATER_FPS=1           log frames per second and the time spent painting waveforms
+//  BEATER_SIZE=WxH        start at this window size (never below the view's minimum)
 static void installDebugHooks(QQmlApplicationEngine &engine, AppController &controller)
 {
     if (qEnvironmentVariableIsSet("BEATER_AUTOPLAY")) {
@@ -52,6 +53,13 @@ static void installDebugHooks(QQmlApplicationEngine &engine, AppController &cont
     const QString mode = qEnvironmentVariable("BEATER_MODE");
     if (!mode.isEmpty() && !engine.rootObjects().isEmpty())
         QMetaObject::invokeMethod(engine.rootObjects().first(), "setMode", Q_ARG(QVariant, mode == "perform"));
+    const QStringList size = qEnvironmentVariable("BEATER_SIZE").split('x');
+    if (size.size() == 2 && !engine.rootObjects().isEmpty()) {
+        if (auto *w = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
+            w->resize(std::max(w->minimumWidth(), size[0].toInt()), std::max(w->minimumHeight(), size[1].toInt()));
+            std::fprintf(stderr, "window %dx%d (minimum %dx%d)\n", w->width(), w->height(), w->minimumWidth(), w->minimumHeight());
+        }
+    }
     const QString snapshot = qEnvironmentVariable("BEATER_SNAPSHOT");
     if (!snapshot.isEmpty()) {
         QTimer::singleShot(qEnvironmentVariableIntValue("BEATER_SNAPSHOT_MS") ?: 6000, &engine, [&engine, snapshot] {

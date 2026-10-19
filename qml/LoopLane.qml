@@ -81,13 +81,18 @@ Item {
     Region { id: customRegion; kind: "custom" }
     Region { id: endRegion; kind: "end" }
 
-    // an In placed, waiting for its Out
+    // an In placed, waiting for its Out: the loop so far, growing with the playhead
     Rectangle {
+        id: pendingRegion
+        readonly property string kind: "custom"
+        readonly property bool active: true
+        readonly property bool armed: true
         visible: lane.ready && lane.deck.customPending
-        x: lane.xAtBeat(lane.deck.customStartBeat) - width / 2
-        width: Theme.s(3)
+        x: lane.xAtBeat(lane.deck.customStartBeat) - Theme.s(1)
+        width: Math.max(Theme.s(3), lane.xAtBeat(lane.deck.beat) - x)
         height: lane.laneHeight
         color: lane.tint
+        opacity: 0.8
         z: 3
     }
 
@@ -100,7 +105,7 @@ Item {
         readonly property bool armed: region.armed
         visible: lane.tags && region.visible
         y: lane.laneHeight + Theme.s(3)
-        x: Math.max(0, Math.min(lane.width - width, region.x))
+        x: lane.tagX(t)
         width: label.implicitWidth + Theme.s(12)
         height: lane.tagHeight
         color: on ? lane.tint : "transparent"
@@ -126,9 +131,34 @@ Item {
         }
         z: 5
     }
-    Tag { region: introRegion; text: "Intro" }
-    Tag { region: customRegion; text: "In / Out" }
-    Tag { region: endRegion; text: "Outro" }
+    Tag { id: introTag; region: introRegion; text: "Intro" }
+    Tag { id: customTag; region: customRegion; text: "In / Out" }
+    Tag { id: pendingTag; region: pendingRegion; text: "In / Out" }
+    Tag { id: endTag; region: endRegion; text: "Outro" }
+
+    // Tags sit under their loop's start, left to right, and never cover each
+    // other: one that would moves right, clear of the one before (and the
+    // last ones move left to stay inside the lane).
+    readonly property var tagPlaces: {
+        const gap = Theme.s(4)
+        const shown = [introTag, customTag, pendingTag, endTag]
+            .filter(t => lane.tags && t.region.visible)
+            .sort((a, b) => a.region.x - b.region.x)
+        const xs = shown.map(t => Math.max(0, t.region.x))
+        for (let i = 1; i < shown.length; ++i)
+            xs[i] = Math.max(xs[i], xs[i - 1] + shown[i - 1].width + gap)
+        // pushed past the end: pull back from the right
+        let limit = lane.width
+        for (let i = shown.length - 1; i >= 0; --i) {
+            xs[i] = Math.max(0, Math.min(xs[i], limit - shown[i].width))
+            limit = xs[i] - gap
+        }
+        return { order: shown, xs: xs }
+    }
+    function tagX(t) {
+        const i = tagPlaces.order.indexOf(t)
+        return i < 0 ? 0 : tagPlaces.xs[i]
+    }
 
     MouseArea {
         id: ma

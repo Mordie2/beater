@@ -8,9 +8,13 @@ Item {
     signal performRequested()
     implicitHeight: Theme.s(64)
 
+    //! The width it needs with nothing cut.
+    readonly property real minWidth: bar.implicitWidth
+
     RowLayout {
+        id: bar
         anchors.fill: parent
-        spacing: Theme.s(24)
+        spacing: Theme.s(16)
 
         Text {
             // the two decks' colours
@@ -78,7 +82,7 @@ Item {
 
         Column {
             spacing: Theme.s(4)
-            Layout.preferredWidth: Theme.s(230)
+            Layout.preferredWidth: Theme.s(200)
             ParamText { text: "output"; caps: true; wrapMode: Text.NoWrap }
             ParamCombo {
                 width: parent.width

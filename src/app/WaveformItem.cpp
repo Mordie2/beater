@@ -316,8 +316,8 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
                 {"end", m_deck->endStartBeat(), m_deck->endEndBeat()},
             };
             QColor fill = m_loopColor, edge = m_loopColor;
-            fill.setAlpha(10);
-            edge.setAlpha(60);
+            fill.setAlpha(22);
+            edge.setAlpha(110);
             for (const auto &l : loops) {
                 if (l.b <= l.a || active == QLatin1String(l.kind))
                     continue;
@@ -326,9 +326,17 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
                 node->over->add(QRectF(x0, 0, 1, h), edge);
                 node->over->add(QRectF(x1 - 1, 0, 1, h), edge);
             }
-            // an In placed, waiting for its Out
-            if (m_deck->customPending())
-                node->over->add(QRectF(xAt(g.secAtBeat(m_deck->customStartBeat())) - 1, 0, 2, h), edge);
+            // an In placed, waiting for its Out: the loop so far, growing with the playhead
+            if (m_deck->customPending()) {
+                const double x0 = xAt(g.secAtBeat(m_deck->customStartBeat()));
+                const double x1 = std::max(x0, xAt(m_deck->shownPosition()));
+                QColor grow = m_loopColor;
+                grow.setAlpha(70);
+                QColor solid = m_loopColor;
+                node->over->add(QRectF(x0, 0, x1 - x0, h), grow);
+                node->over->add(QRectF(x0, 0, x1 - x0, 4), solid);
+                node->over->add(QRectF(x0 - 1, 0, 2, h), solid);
+            }
         }
         // the loop in use (or the one being drawn with Shift)
         double la = m_deck->activeLoopStartBeat(), lb = m_deck->activeLoopEndBeat();
@@ -340,12 +348,12 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
             const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
             const bool on = !m_deck->activeLoop().isEmpty() || m_dragging;
             QColor fill = m_loopColor, edge = m_loopColor;
-            fill.setAlpha(on ? 40 : 12);
-            edge.setAlpha(on ? 220 : 70);
+            fill.setAlpha(on ? 75 : 22);
+            edge.setAlpha(on ? 255 : 110);
             node->over->add(QRectF(x0, 0, x1 - x0, h), fill);
-            node->over->add(QRectF(x0, 0, 1.5, h), edge);
-            node->over->add(QRectF(x1 - 1.5, 0, 1.5, h), edge);
-            node->over->add(QRectF(x0, 0, x1 - x0, 3), edge);
+            node->over->add(QRectF(x0, 0, 2, h), edge);
+            node->over->add(QRectF(x1 - 2, 0, 2, h), edge);
+            node->over->add(QRectF(x0, 0, x1 - x0, 4), edge);
         }
         // played part dimmed, playhead
         const double px = xAt(m_deck->shownPosition());
@@ -368,13 +376,26 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
             node->key = key;
         }
 
-        // the loop in use, underneath
+        // the loop in use: tinted underneath, a band along the top and its edges over
         const double la = m_deck->activeLoopStartBeat(), lb = m_deck->activeLoopEndBeat();
         if (g.valid() && lb > la) {
             const double x0 = xAt(g.secAtBeat(la)), x1 = xAt(g.secAtBeat(lb));
             QColor fill = m_loopColor;
-            fill.setAlpha(30);
+            fill.setAlpha(60);
             node->under->add(QRectF(x0, 0, x1 - x0, h), fill);
+            node->over->add(QRectF(x0, 0, x1 - x0, 5), m_loopColor);
+            node->over->add(QRectF(x0 - 1, 0, 2, h), m_loopColor);
+            node->over->add(QRectF(x1 - 1, 0, 2, h), m_loopColor);
+        }
+        // an In placed, waiting for its Out: the loop so far, up to the playhead
+        if (g.valid() && m_deck->customPending()) {
+            const double x0 = xAt(g.secAtBeat(m_deck->customStartBeat()));
+            const double x1 = std::max(x0, w / 2);
+            QColor fill = m_loopColor;
+            fill.setAlpha(60);
+            node->under->add(QRectF(x0, 0, x1 - x0, h), fill);
+            node->over->add(QRectF(x0, 0, x1 - x0, 5), m_loopColor);
+            node->over->add(QRectF(x0 - 1, 0, 2, h), m_loopColor);
         }
 
         // the tiles in view
