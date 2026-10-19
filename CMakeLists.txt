@@ -81,6 +81,9 @@ qt_standard_project_setup(REQUIRES 6.5)
 qt_add_executable(beater
     src/main.cpp
 )
+# qmltyperegistrar includes the QML_ELEMENT headers by bare file name
+target_include_directories(beater PRIVATE src/app)
+set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(beater
     URI Beater
@@ -105,7 +108,6 @@ qt_add_qml_module(beater
         src/app/WaveformItem.h
         src/app/WaveformItem.cpp
 )
-set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 set_target_properties(beater PROPERTIES
     MACOSX_BUNDLE TRUE
