@@ -165,9 +165,8 @@ void DeckController::computeLoop()
         return;
     }
     // Last whole bars of the track.
-    const double lastBeat = g.beatAtSec(m_buffer->durationSec());
-    m_loopEnd = std::floor(lastBeat / 4.0) * 4.0;
-    m_loopStart = std::max(std::ceil(g.beatAtSec(0.0) / 4.0) * 4.0, m_loopEnd - 4.0 * m_loopBars);
+    m_loopEnd = g.lastLoopBeat(m_buffer->durationSec());
+    m_loopStart = std::max(g.firstLoopBeat(), m_loopEnd - 4.0 * m_loopBars);
     if (m_loopEnd <= m_loopStart)
         m_loopStart = m_loopEnd = 0.0;
 }

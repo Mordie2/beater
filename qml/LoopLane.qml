@@ -18,9 +18,10 @@ Item {
     function xAtBeat(b) { return (deck.firstBeat + b * 60 / deck.bpm) / deck.duration * width }
     function beatAtX(x) { return (x / width * deck.duration - deck.firstBeat) * deck.bpm / 60 }
     function snap(b, fine) { const q = fine ? 1 : 4; return Math.round(b / q) * q }
-    // whole bars (beats with Option) inside the track
-    function firstBeat(fine) { const q = fine ? 1 : 4; return Math.ceil(beatAtX(0) / q) * q }
-    function lastBeat(fine) { const q = fine ? 1 : 4; return Math.floor(beatAtX(width) / q) * q }
+    // The bar lines (beats with Option) a loop may use: as BeatGrid's
+    // first/lastLoopBeat, a bar cut short by under half a beat still counts.
+    function firstBeat(fine) { const q = fine ? 1 : 4; return Math.ceil((beatAtX(0) - 0.5) / q) * q }
+    function lastBeat(fine) { const q = fine ? 1 : 4; return Math.floor((beatAtX(width) + 0.5) / q) * q }
 
     // while dragging: the region being edited; NaN = show the deck's
     property real editA: NaN
