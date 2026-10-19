@@ -1,22 +1,29 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import HighlighterUI
 
 ApplicationWindow {
     id: window
     required property AppController app
 
-    width: 1400
-    height: 860
-    minimumWidth: 1100
-    minimumHeight: 640
+    width: 1440
+    height: 900
+    minimumWidth: 1200
+    minimumHeight: 720
     visible: true
     title: "beater"
-    color: Theme.bg
+    color: Theme.page
+
+    Component.onCompleted: {
+        Theme.accent = Look.deckA
+        Theme.slidersStartMinimised = false   // volume faders want the full bar
+    }
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 0
+        anchors.margins: Theme.s(12)
+        spacing: Theme.s(12)
 
         TopBar {
             app: window.app
@@ -27,20 +34,24 @@ ApplicationWindow {
             Layout.fillWidth: true
             // a nested layout inherits fillHeight from its children; the playlist gets the rest
             Layout.fillHeight: false
-            Layout.preferredHeight: 360
-            Layout.margins: 10
-            spacing: 10
+            Layout.preferredHeight: Theme.s(480)
+            spacing: Theme.s(12)
             DeckView {
                 app: window.app
                 deck: window.app.deckA
-                accent: Theme.deckA
+                accent: Look.deckA
                 Layout.fillWidth: true
+                Layout.fillHeight: true
+            }
+            MixView {
+                app: window.app
+                Layout.preferredWidth: Theme.s(250)
                 Layout.fillHeight: true
             }
             DeckView {
                 app: window.app
                 deck: window.app.deckB
-                accent: Theme.deckB
+                accent: Look.deckB
                 Layout.fillWidth: true
                 Layout.fillHeight: true
             }
@@ -50,10 +61,7 @@ ApplicationWindow {
             app: window.app
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.minimumHeight: 150
-            Layout.leftMargin: 10
-            Layout.rightMargin: 10
-            Layout.bottomMargin: 10
+            Layout.minimumHeight: Theme.s(160)
         }
     }
 }

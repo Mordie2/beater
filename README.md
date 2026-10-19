@@ -7,6 +7,7 @@ A small two-deck, loop-based DJ app that sits next to Resolume. Qt 6 / QML / C++
 Open `CMakeLists.txt` in Qt Creator with the Qt 6.11 macOS kit and hit Run. Or from a terminal:
 
 ```sh
+git submodule update --init   # the UI kit, external/highlighter-ui
 cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=~/Qt/6.11.2/macos
 cmake --build build
 open build/beater.app
@@ -20,8 +21,8 @@ If `cmake` / `ninja` aren't on your PATH, use the ones Qt ships:
 Headless engine checks: `./build/engine_test`.
 
 Files or folders passed on the command line are added to the playlist. Debug hooks
-(environment variables, see `src/main.cpp`): `BEATER_TEST=1` uses Qt's test data
-folders instead of the real library, `BEATER_AUTOPLAY=1` loads rows 1 and 2 into
+(environment variables, see `src/main.cpp`): `BEATER_TEST=1` uses its own settings and
+Qt's test data folders instead of the real library, `BEATER_AUTOPLAY=1` loads rows 1 and 2 into
 decks A and B, plays them and logs deck state, and `BEATER_SNAPSHOT=out.png` saves
 a grab of the window after a few seconds and quits.
 
@@ -41,7 +42,9 @@ src/core       small shared types (beat grid, keys, lock-free queue, track buffe
 src/audio      decoder (ExtAudioFile on macOS, miniaudio fallback), deck engine, audio engine
 src/analysis   tempo / grid estimator
 src/app        Qt side: library model, deck + app controllers, waveform item
-qml/           UI
+qml/           UI, built on HighlighterUI (external/highlighter-ui, `import HighlighterUI`).
+               Look.qml holds the deck colours (A orange, B violet; orange is the app accent).
+               A panel that declares `property color accent` tints the kit controls inside it.
 tests/         headless engine tests
 ```
 

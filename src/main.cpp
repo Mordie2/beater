@@ -11,7 +11,7 @@
 #include <cstdio>
 
 // Debug hooks for checking the app without a person at the screen:
-//  BEATER_TEST=1          use Qt's test data dirs (leaves the real library alone)
+//  BEATER_TEST=1          own settings and test data dirs (leaves the real library alone)
 //  BEATER_AUTOPLAY=1      load playlist rows 0 and 1 into decks A and B, play, log deck state
 //  BEATER_SNAPSHOT=x.png  save a grab of the window after a few seconds, then quit
 static void installDebugHooks(QQmlApplicationEngine &engine, AppController &controller)
@@ -50,8 +50,10 @@ int main(int argc, char *argv[])
     QGuiApplication::setOrganizationDomain("blocksystem.nl");
     QGuiApplication::setApplicationName("beater");
     QQuickStyle::setStyle("Basic");
-    if (qEnvironmentVariableIsSet("BEATER_TEST"))
+    if (qEnvironmentVariableIsSet("BEATER_TEST")) {
+        QGuiApplication::setApplicationName("beater-test"); // own QSettings and panel memory
         QStandardPaths::setTestModeEnabled(true);
+    }
 
     AppController controller;
 

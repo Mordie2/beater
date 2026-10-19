@@ -1,0 +1,3 @@
+[submodule "external/highlighter-ui"]
+	path = external/highlighter-ui
+	url = https://github.com/chrisssstos/highlighter-ui

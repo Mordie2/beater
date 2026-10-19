@@ -78,6 +78,9 @@ if(NOT BEATER_CORE_ONLY)
 find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2 Concurrent)
 qt_standard_project_setup(REQUIRES 6.5)
 
+# UI kit (git submodule: git submodule update --init)
+add_subdirectory(external/highlighter-ui/HighlighterUI ${CMAKE_BINARY_DIR}/HighlighterUI)
+
 qt_add_executable(beater
     src/main.cpp
 )
@@ -85,20 +88,19 @@ qt_add_executable(beater
 target_include_directories(beater PRIVATE src/app)
 set(BEATER_QML
     qml/Main.qml
-    qml/Theme.qml
+    qml/Look.qml
+    qml/Panel.qml
     qml/TopBar.qml
     qml/DeckView.qml
+    qml/MixView.qml
     qml/Playlist.qml
-    qml/Fader.qml
-    qml/Btn.qml
-    qml/Readout.qml
 )
 # Put the QML files at the module root so they see the module's C++ types.
 foreach(f IN LISTS BEATER_QML)
     get_filename_component(n ${f} NAME)
     set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${n})
 endforeach()
-set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/Look.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(beater
     URI Beater
@@ -124,7 +126,7 @@ set_target_properties(beater PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
 )
 
-target_link_libraries(beater PRIVATE beater_core Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent)
+target_link_libraries(beater PRIVATE beater_core HighlighterUIplugin Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent)
 endif()
 
 # ---------------------------------------------------------------------------
