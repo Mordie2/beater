@@ -7,10 +7,12 @@ import HighlighterUI
 Panel {
     id: root
     required property AppController app
+    //! Perform mode: shorter rows, no time column, no hints.
+    property bool compact: false
 
     title: "Playlist"
     note: root.app.library.count + " tracks" + (root.app.library.analyzingCount > 0 ? " · analyzing " + root.app.library.analyzingCount : "")
-           + "  ·  drop files or folders · double-click loads to the free deck · ⌫ removes"
+           + (root.compact ? "" : "  ·  drop files or folders · double-click loads to the free deck · ⌫ removes")
     tools: ParamButton { text: "Add…"; onClicked: dialog.open() }
 
     FileDialog {
@@ -52,6 +54,7 @@ Panel {
 
         // column header
         RowLayout {
+            visible: !root.compact
             Layout.fillWidth: true
             spacing: 0
             ParamText { text: "#"; caps: true; Layout.preferredWidth: Theme.s(36) }
@@ -89,7 +92,7 @@ Panel {
                 required property bool gridManual
 
                 width: ListView.view.width
-                height: Theme.s(30)
+                height: root.compact ? Theme.s(26) : Theme.s(30)
                 color: ListView.isCurrentItem ? Theme.sunken : hover.hovered ? Theme.sunkenHover : "transparent"
                 HoverHandler { id: hover }
 
@@ -103,6 +106,7 @@ Panel {
                     anchors.fill: parent
                     spacing: 0
                     ParamText {
+                        visible: !root.compact
                         text: row.index + 1
                         tone: "faint"
                         mono: true
@@ -113,6 +117,8 @@ Panel {
                     ParamText {
                         text: row.title
                         tone: "normal"
+                        small: root.compact
+                        Layout.leftMargin: root.compact ? Theme.s(4) : 0
                         wrapMode: Text.NoWrap
                         elide: Text.ElideRight
                         Layout.fillWidth: true
@@ -123,15 +129,18 @@ Panel {
                         color: row.status.startsWith("error") ? Theme.danger : Theme.accent
                         mono: true
                         wrapMode: Text.NoWrap
-                        Layout.preferredWidth: Theme.s(76)
+                        small: root.compact
+                        Layout.preferredWidth: root.compact ? Theme.s(44) : Theme.s(76)
                     }
                     ParamText {
-                        text: row.keyText
+                        text: root.compact ? row.keyText.split(" ")[0] : row.keyText   // Camelot only when compact
                         mono: true
+                        small: root.compact
                         wrapMode: Text.NoWrap
-                        Layout.preferredWidth: Theme.s(96)
+                        Layout.preferredWidth: root.compact ? Theme.s(36) : Theme.s(96)
                     }
                     ParamText {
+                        visible: !root.compact
                         text: row.durationText
                         mono: true
                         wrapMode: Text.NoWrap
@@ -139,7 +148,7 @@ Panel {
                     }
                     Row {
                         spacing: Theme.s(4)
-                        Layout.preferredWidth: Theme.s(64)
+                        Layout.preferredWidth: Theme.s(60)
                         DeckButton { text: "A"; accent: Look.deckA; onClicked: root.app.loadToDeck(row.index, 0) }
                         DeckButton { text: "B"; accent: Look.deckB; onClicked: root.app.loadToDeck(row.index, 1) }
                     }

@@ -104,7 +104,7 @@ Panel {
 
             Item { Layout.fillWidth: true }
 
-            Label { text: root.deck.gridManual ? "bpm (edited)" : "bpm" }
+            Label { text: root.deck.analyzing ? "bpm (analyzing…)" : root.deck.gridManual ? "bpm (edited)" : "bpm" }
             // click to type, Up / Down step 0.01 (Shift 1)
             ParamValueBox {
                 visible: root.deck.bpm > 0
@@ -167,11 +167,16 @@ Panel {
             ParamButton { icon: "◀"; implicitWidth: Theme.s(28); enabled: root.deck.bpm > 0; onClicked: root.deck.nudgeGrid(-5) }
             ParamButton { icon: "▶"; implicitWidth: Theme.s(28); enabled: root.deck.bpm > 0; onClicked: root.deck.nudgeGrid(5) }
             ParamButton { text: "Set 1"; enabled: root.deck.bpm > 0; onClicked: root.deck.setDownbeatHere() }
+            // back to the detected BPM and grid
+            ParamButton { text: "Auto"; enabled: root.deck.gridManual && !root.deck.analyzing; onClicked: root.deck.autoGrid() }
             Item { Layout.fillWidth: true }
         }
         RowLayout {
             spacing: Theme.s(4)
-            Label { text: "key"; Layout.rightMargin: Theme.s(4) }
+            Label {
+                text: root.deck.analyzing ? "key …" : root.deck.keyManual ? "key (edited)" : "key"
+                Layout.rightMargin: Theme.s(4)
+            }
             ParamCombo {
                 Layout.preferredWidth: Theme.s(130)
                 enabled: root.deck.loaded
@@ -179,6 +184,8 @@ Panel {
                 currentIndex: root.deck.key
                 onActivated: i => root.deck.setKey(i)
             }
+            // back to the detected key
+            ParamButton { text: "Auto"; enabled: root.deck.keyManual && !root.deck.analyzing; onClicked: root.deck.autoKey() }
             Label { text: "shift"; Layout.leftMargin: Theme.s(12); Layout.rightMargin: Theme.s(4) }
             ParamButton { text: "−"; implicitWidth: Theme.s(28); enabled: root.deck.keyShift > -12; onClicked: root.deck.keyShift = root.deck.keyShift - 1 }
             ParamValueBox {

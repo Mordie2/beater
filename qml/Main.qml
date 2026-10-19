@@ -1,67 +1,76 @@
+import QtCore
 import QtQuick
 import QtQuick.Controls.Basic
-import QtQuick.Layouts
 import HighlighterUI
 
 ApplicationWindow {
     id: window
     required property AppController app
 
-    width: 1440
-    height: 900
-    minimumWidth: 1200
-    minimumHeight: 720
+    readonly property bool perform: prefs.perform
+
     visible: true
     title: "beater"
     color: Theme.page
+    minimumWidth: perform ? Theme.s(360) : 1200
+    minimumHeight: perform ? Theme.s(480) : 720
+    flags: perform && prefs.onTop ? (Qt.Window | Qt.WindowStaysOnTopHint) : Qt.Window
+
+    // Each mode remembers its own window size.
+    Settings {
+        id: prefs
+        category: "window"
+        property bool perform: false
+        property bool onTop: false
+        property int editWidth: 1440
+        property int editHeight: 900
+        property int performWidth: 400
+        property int performHeight: 760
+    }
+
+    function rememberSize() {
+        if (perform) { prefs.performWidth = width; prefs.performHeight = height }
+        else { prefs.editWidth = width; prefs.editHeight = height }
+    }
+    function setMode(p) {
+        if (p === perform) return
+        rememberSize()
+        prefs.perform = p
+        width = p ? prefs.performWidth : prefs.editWidth
+        height = p ? prefs.performHeight : prefs.editHeight
+    }
 
     Component.onCompleted: {
         Theme.accent = Look.deckA
         Theme.slidersStartMinimised = false   // volume faders want the full bar
+        width = perform ? prefs.performWidth : prefs.editWidth
+        height = perform ? prefs.performHeight : prefs.editHeight
+    }
+    onClosing: rememberSize()
+
+    Shortcut {
+        sequence: "Ctrl+E"   // ⌘E on macOS
+        onActivated: window.setMode(!window.perform)
     }
 
-    ColumnLayout {
+    Loader {
         anchors.fill: parent
-        anchors.margins: Theme.s(12)
-        spacing: Theme.s(12)
-
-        TopBar {
+        sourceComponent: window.perform ? performView : editView
+    }
+    Component {
+        id: editView
+        EditView {
             app: window.app
-            Layout.fillWidth: true
+            onPerformRequested: window.setMode(true)
         }
-
-        RowLayout {
-            Layout.fillWidth: true
-            // a nested layout inherits fillHeight from its children; the playlist gets the rest
-            Layout.fillHeight: false
-            Layout.preferredHeight: Theme.s(480)
-            spacing: Theme.s(12)
-            DeckView {
-                app: window.app
-                deck: window.app.deckA
-                accent: Look.deckA
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-            }
-            MixView {
-                app: window.app
-                Layout.preferredWidth: Theme.s(250)
-                Layout.fillHeight: true
-            }
-            DeckView {
-                app: window.app
-                deck: window.app.deckB
-                accent: Look.deckB
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-            }
-        }
-
-        Playlist {
+    }
+    Component {
+        id: performView
+        PerformView {
             app: window.app
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.minimumHeight: Theme.s(160)
+            onTop: prefs.onTop
+            onEditRequested: window.setMode(false)
+            onOnTopToggled: on => prefs.onTop = on
         }
     }
 }

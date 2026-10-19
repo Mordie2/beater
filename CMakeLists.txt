@@ -92,9 +92,15 @@ set(BEATER_QML
     qml/Main.qml
     qml/Look.qml
     qml/Panel.qml
+    qml/MasterTempo.qml
+    qml/BeatLights.qml
+    qml/ModeSwitch.qml
     qml/TopBar.qml
+    qml/EditView.qml
     qml/DeckView.qml
     qml/MixView.qml
+    qml/PerformView.qml
+    qml/PerformDeck.qml
     qml/Playlist.qml
 )
 # Put the QML files at the module root so they see the module's C++ types.

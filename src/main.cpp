@@ -14,6 +14,7 @@
 //  BEATER_TEST=1          own settings and test data dirs (leaves the real library alone)
 //  BEATER_AUTOPLAY=1      load playlist rows 0 and 1 into decks A and B, play, log deck state
 //  BEATER_SNAPSHOT=x.png  save a grab of the window after a few seconds, then quit
+//  BEATER_MODE=perform    start in perform (or edit) mode
 static void installDebugHooks(QQmlApplicationEngine &engine, AppController &controller)
 {
     if (qEnvironmentVariableIsSet("BEATER_AUTOPLAY")) {
@@ -32,6 +33,9 @@ static void installDebugHooks(QQmlApplicationEngine &engine, AppController &cont
         QTimer::singleShot(4000, &controller, [&controller] { controller.loadToDeck(1, 1); });
         log->start(1000);
     }
+    const QString mode = qEnvironmentVariable("BEATER_MODE");
+    if (!mode.isEmpty() && !engine.rootObjects().isEmpty())
+        QMetaObject::invokeMethod(engine.rootObjects().first(), "setMode", Q_ARG(QVariant, mode == "perform"));
     const QString snapshot = qEnvironmentVariable("BEATER_SNAPSHOT");
     if (!snapshot.isEmpty()) {
         QTimer::singleShot(qEnvironmentVariableIntValue("BEATER_SNAPSHOT_MS") ?: 6000, &engine, [&engine, snapshot] {

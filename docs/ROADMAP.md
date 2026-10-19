@@ -7,14 +7,17 @@
 - Per-deck volume + master, level meters
 - Playlist with drag-and-drop, persistent library keyed by content hash
 - Built-in BPM / grid estimator (spectral flux + autocorrelation + whole-track phase fold, kick-band downbeat)
-- Manual BPM / grid / key editing
+- Built-in key estimator (peak chromagram + Temperley profiles), a stopgap until stage 2
+- Manual BPM / grid / key editing, Auto to go back to the detected values
+- Edit mode (everything) and Perform mode (compact column next to Resolume, pin on top)
 
 ## Stage 2: analysis quality
 - **Beat This** (CPJKU, MIT) via ONNX Runtime for beats + downbeats. Needs: ONNX export of the
   checkpoint, the exact log-mel front end (22.05 kHz, 50 fps, 128 mels), then fit a constant-tempo
   grid to its beats. Replaces `estimateTempo`, same `TempoResult` shape.
 - **Key**: libkeyfinder and Essentia `Key` with the `edma` / `bgate` profiles, run both, compare
-  against manual corrections on the real library, keep the better one (or use agreement as confidence).
+  against manual corrections on the real library (and the built-in estimator), keep the better
+  one (or use agreement as confidence). Bump `kAnalysisVersion` so the library is redone.
 - Re-analyze button per track (already in the model: `Library::reanalyze`).
 
 ## Stage 3: control
