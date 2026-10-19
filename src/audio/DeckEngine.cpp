@@ -268,8 +268,12 @@ void DeckEngine::render(float *outL, float *outR, int n, const MasterState &m)
         m_pending = Pending::None;
     } else if (m_pending == Pending::Seek) {
         m_pending = Pending::None;
-        startAt(alignedFrame(m_pendingFrame, MasterState{m.bpm, m.beat + n * m.bpm / 60.0 / m.sampleRate, m.sampleRate, m.phase}),
-                targetBaseRatio(m), pitch);
+        double frame = alignedFrame(m_pendingFrame, MasterState{m.bpm, m.beat + n * m.bpm / 60.0 / m.sampleRate, m.sampleRate, m.phase});
+        // A jump aimed inside the loop that the phase alignment pushed past its
+        // end would miss the loop: wrap it back in.
+        if (loopValid() && m_pendingFrame >= m_loopStartF && m_pendingFrame < m_loopEndF && frame >= m_loopEndF)
+            frame -= m_loopEndF - m_loopStartF;
+        startAt(frame, targetBaseRatio(m), pitch);
     }
     publish();
 }

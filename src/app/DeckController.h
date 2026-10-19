@@ -144,7 +144,7 @@ public:
 
     // transport
     Q_INVOKABLE void togglePlay();
-    Q_INVOKABLE void play();
+    Q_INVOKABLE void play(); // paused: play from here; playing: again from the start
     Q_INVOKABLE void pause();
     Q_INVOKABLE void cue();
     Q_INVOKABLE void seek(double sec);
@@ -209,6 +209,8 @@ private:
     void sendLoop();
     void computeLoop();
     void jumpInto(double startBeat, double endBeat); // into a loop the playhead is past
+    // From there, staying in phase when playing; within > 0: and no further on than that.
+    void jumpToBeat(double target, double within = 0.0);
     void commitRecord(); // write m_rec to the library
     void updatePlayingBpm();
     double snapToBeat(double sec) const;

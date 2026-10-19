@@ -175,14 +175,23 @@ Panel {
                 spacing: Theme.s(4)
 
                 RowLayout {
+                    // the state you're in is the solid one
                     property color accent: Look.transport
+                    spacing: Theme.s(4)
                     Btn {
-                        implicitWidth: Theme.s(86)
-                        accent: true
-                        icon: root.deck.playing ? "❚❚" : "▶"
-                        text: root.deck.playing ? "Pause" : "Play"
+                        // paused: play from here; playing: again from the start
+                        icon: "\u25B6"
+                        text: "Play"
+                        accent: root.deck.playing
                         enabled: root.deck.loaded
-                        onClicked: root.deck.togglePlay()
+                        onClicked: root.deck.play()
+                    }
+                    Btn {
+                        icon: "\u275A\u275A"
+                        text: "Pause"
+                        accent: root.deck.loaded && !root.deck.playing
+                        enabled: root.deck.loaded
+                        onClicked: root.deck.pause()
                     }
                 }
                 Gap {}

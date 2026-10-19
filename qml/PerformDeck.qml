@@ -105,14 +105,22 @@ ParamPlate {
         RowLayout {
             spacing: Theme.s(4)
             RowLayout {
-                property color accent: Look.transport   // mint: transport
-                spacing: Theme.s(4)
+                property color accent: Look.transport   // play / pause: the state you're in is solid
+                spacing: Theme.s(3)
                 ParamButton {
-                    implicitWidth: Theme.s(40)
-                    accent: true
-                    icon: root.deck.playing ? "\u275A\u275A" : "\u25B6"
+                    // paused: play from here; playing: again from the start
+                    implicitWidth: Theme.s(34)
+                    icon: "\u25B6"
+                    accent: root.deck.playing
                     enabled: root.deck.loaded
-                    onClicked: root.deck.togglePlay()
+                    onClicked: root.deck.play()
+                }
+                ParamButton {
+                    implicitWidth: Theme.s(34)
+                    icon: "\u275A\u275A"
+                    accent: root.deck.loaded && !root.deck.playing
+                    enabled: root.deck.loaded
+                    onClicked: root.deck.pause()
                 }
             }
             RowLayout {

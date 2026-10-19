@@ -270,12 +270,45 @@ static void testKeyShiftAndLoop()
     e.collectGarbage();
 }
 
+// Jumps aimed just inside a loop's end, at different moments: the phase
+// alignment may push them past the end, and they must still loop.
+static void testJumpIntoLoopEnd()
+{
+    std::printf("jump into a loop near its end\n");
+    const uint32_t sr = 48000;
+    std::vector<float> x(size_t(30.0 * sr));
+    for (size_t i = 0; i < x.size(); ++i)
+        x[i] = 0.5f * float(std::sin(2 * M_PI * 220.0 * double(i) / sr));
+    int held = 0;
+    const int trials = 8;
+    for (int k = 0; k < trials; ++k) {
+        AudioEngine e;
+        e.initOffline(sr);
+        e.setMasterBpm(120.0);
+        e.post(0, {DeckCommand::Load, 0.0, 0.0, makeTrack(x, sr)});
+        e.post(0, {DeckCommand::SetGrid, 120.0, 0.0});
+        e.post(0, {DeckCommand::SetLoop, 8.0, 12.0}); // 4 s .. 6 s
+        e.post(0, {DeckCommand::SetLoopEnabled, 1.0});
+        e.post(0, {DeckCommand::SetSync, 1.0});
+        e.post(0, {DeckCommand::Play});
+        renderSeconds(e, 1.0 + 0.0625 * k); // a different master phase each time
+        e.post(0, {DeckCommand::Seek, (6.0 - 0.01) * sr});
+        renderSeconds(e, 4.0);
+        const double pos = e.deck(0).pubPosFrame.load() / sr;
+        held += pos >= 4.0 && pos < 6.0;
+        e.collectGarbage();
+    }
+    std::printf("  %d / %d jumps to 10 ms before the end still loop\n", held, trials);
+    CHECK(held == trials, "%d of %d jumps missed the loop", trials - held, trials);
+}
+
 int main()
 {
     testTempo();
     testSync();
     testKeyShiftAndLoop();
     testKey();
+    testJumpIntoLoopEnd();
     std::printf(g_fail ? "\n%d check(s) failed\n" : "\nall checks passed\n", g_fail);
     return g_fail ? 1 : 0;
 }

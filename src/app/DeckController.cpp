@@ -232,21 +232,9 @@ void DeckController::sendLoop()
 
 void DeckController::jumpInto(double startBeat, double endBeat)
 {
-    // Playing: keep the place in the bar, so the deck stays in phase; paused:
-    // to the start of the loop.
-    const BeatGrid g = m_rec.grid();
-    if (!g.valid() || !m_buffer || endBeat <= startBeat)
-        return;
-    double target = startBeat;
-    if (m_playing)
-        target += std::fmod(std::fmod(beat() - startBeat, 4.0) + 4.0, 4.0);
-    target = std::min(target, endBeat - 0.01);
-    const double sec = g.secAtBeat(target);
-    m_engine->post(m_index, {DeckCommand::Seek, sec * m_engine->sampleRate()});
-    if (!m_playing) {
-        m_position = sec;
-        emit positionChanged();
-    }
+    // in phase, early in the loop (not at its edge, where it could be missed)
+    if (endBeat > startBeat)
+        jumpToBeat(startBeat, endBeat - startBeat);
 }
 
 void DeckController::updatePlayingBpm()
@@ -312,8 +300,42 @@ void DeckController::togglePlay()
 
 void DeckController::play()
 {
-    if (m_buffer)
+    if (!m_buffer)
+        return;
+    if (!m_playing) {
         m_engine->post(m_index, {DeckCommand::Play});
+        return;
+    }
+    // again while playing: from the start (the first bar line), in phase
+    const BeatGrid g = m_rec.grid();
+    if (g.valid())
+        jumpToBeat(g.firstLoopBeat());
+    else
+        m_engine->post(m_index, {DeckCommand::Seek, 0.0});
+}
+
+void DeckController::jumpToBeat(double target, double within)
+{
+    // Playing (and synced), the deck must keep its place in the beat (in the
+    // bar, with bar phase lock): land at or just after the target, at the
+    // same phase. Paused: on the target.
+    const BeatGrid g = m_rec.grid();
+    if (!g.valid() || !m_buffer)
+        return;
+    if (m_playing) {
+        const double b = beat();
+        const bool bar = m_engine->phaseMode() == PhaseMode::Bar;
+        double off = bar ? std::fmod(std::fmod(b - target, 4.0) + 4.0, 4.0) : b - std::floor(b);
+        if (within > 0.0 && off >= within)
+            off = std::fmod(off, within);
+        target += off;
+    }
+    const double sec = g.secAtBeat(target);
+    m_engine->post(m_index, {DeckCommand::Seek, sec * m_engine->sampleRate()});
+    if (!m_playing) {
+        m_position = sec;
+        emit positionChanged();
+    }
 }
 
 void DeckController::pause()
@@ -543,6 +565,11 @@ void DeckController::loopIn()
 {
     if (!m_buffer || !m_rec.grid().valid())
         return;
+    // In a closed In / Out loop that's running: back to its In (in phase, inside the loop)
+    if (m_customOn && hasCustom()) {
+        jumpToBeat(m_customStart, m_customEnd - m_customStart);
+        return;
+    }
     // a new In: any In / Out loop goes, the next Out closes this one
     m_customStart = m_customEnd = std::round(beat());
     m_customPending = true;

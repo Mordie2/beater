@@ -49,6 +49,10 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
 - **Grid edit** (the pencil): the row becomes BPM, ×2 / ÷2, Tap, =M, grid nudge, Set 1,
   Auto, and key. Drag the big waveform to slide the grid under the music; double-click a beat
   to make it the 1. Done (or the pencil again) goes back.
+- **Play / Pause**: two buttons, the state you're in solid. PLAY while paused plays from
+  there; PLAY again while playing starts the track over from its first bar line. Jumps keep
+  a synced deck in phase: it lands at the same place in the beat (in the bar, with bar phase
+  lock), at or just after the target.
 - **Moving around**: click or drag on the timeline (the overview under the big waveform) and
   the playhead follows; the deck jumps there when you let go, on the beat, or in phase with
   the master when it's synced and playing. The big waveform can be grabbed and dragged the
@@ -59,7 +63,8 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
   - **Intro**: its first N bars (8 by default). A loaded track starts with INTRO armed, so
     play loops the intro until you release it.
   - **In / Out**: a loop anywhere in between. IN marks the playhead (nearest beat); OUT
-    marks the end and the loop starts at once, jumping back to the In in phase. LOOP turns it
+    marks the end and the loop starts at once, jumping back to the In in phase. IN while a
+    closed In / Out loop runs plays it again from its In. LOOP turns it
     off and back on (on again with the playhead past it jumps back in). HERE makes one of
     the chosen length from the current bar.
   - **Outro** (the end loop): its last N bars. Armed by default, so a track that runs out keeps looping its

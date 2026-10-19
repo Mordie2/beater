@@ -49,6 +49,7 @@ public:
     double masterBpm() const { return m_masterBpm.load(); }
     void setMasterVolume(float v) { m_masterVolume.store(v); }
     void setPhaseMode(PhaseMode p) { m_phase.store(int(p)); }
+    PhaseMode phaseMode() const { return PhaseMode(m_phase.load()); }
     double masterBeat() const { return m_pubMasterBeat.load(std::memory_order_relaxed); }
     float masterLevel() const { return m_pubMasterLevel.load(std::memory_order_relaxed); }
     DeckEngine &deck(int i) { return *m_decks[size_t(i)]; }
