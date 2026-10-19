@@ -156,7 +156,7 @@ ParamPlate {
                     onToggled: v => root.deck.customOn = v
                 }
                 ParamButton {
-                    text: "End"
+                    text: "Outro"
                     horizontalPadding: Theme.s(7)
                     checkable: true
                     checked: root.deck.endArmed

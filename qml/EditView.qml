@@ -52,8 +52,8 @@ Item {
             }
 
             ColumnLayout {
-                Layout.preferredWidth: Theme.s(380)
-                Layout.maximumWidth: Theme.s(380)
+                Layout.preferredWidth: Theme.s(300)
+                Layout.maximumWidth: Theme.s(300)
                 Layout.fillHeight: true
                 spacing: Theme.s(12)
                 MixView {

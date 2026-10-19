@@ -426,10 +426,15 @@ void DeckController::tap()
 
 void DeckController::setDownbeatHere()
 {
+    setDownbeatAt(m_position);
+}
+
+void DeckController::setDownbeatAt(double sec)
+{
     if (m_rec.id.isEmpty() || !m_rec.grid().valid())
         return;
     const double bar = 4.0 * m_rec.grid().secPerBeat();
-    m_rec.firstBeatSec = m_position - bar * std::floor(m_position / bar);
+    m_rec.firstBeatSec = sec - bar * std::floor(sec / bar);
     m_rec.gridManual = true;
     sendGrid();
     computeLoop();

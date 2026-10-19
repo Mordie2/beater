@@ -199,6 +199,10 @@ WaveformItem::WaveformItem(QQuickItem *parent)
     setAcceptedMouseButtons(Qt::LeftButton);
     setCursor(Qt::ArrowCursor);
     connect(this, &WaveformItem::colorChanged, this, [this] { update(); }); // gridColor / loopColor
+    connect(this, &WaveformItem::gridEditChanged, this, [this] {
+        setCursor(m_zoom ? (m_gridEdit ? Qt::SizeHorCursor : Qt::OpenHandCursor) : Qt::ArrowCursor);
+        update();
+    });
 }
 
 void WaveformItem::setDeck(DeckController *d)
@@ -349,7 +353,8 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         node->over->add(QRectF(px - 1, 0, 2, h), QColor(255, 255, 255));
     } else {
         // ---------------------------------------------------------- zoom
-        const BeatGrid g = m_deck->grid();
+        BeatGrid g = m_deck->grid();
+        g.firstBeatSec += m_gridShift; // the grid being dragged
         const double pos = m_deck->shownPosition();
         const double spb = g.valid() ? g.secPerBeat() : 0.5;
         const double span = m_zoomBeats * spb;
@@ -410,6 +415,14 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         }
         // fixed playhead in the middle
         node->over->add(QRectF(w / 2 - 1, 0, 2, h), QColor(255, 255, 255));
+        // grid edit: a frame in the grid's colour
+        if (m_gridEdit) {
+            const double t = 2.0;
+            node->over->add(QRectF(0, 0, w, t), m_gridColor);
+            node->over->add(QRectF(0, h - t, w, t), m_gridColor);
+            node->over->add(QRectF(0, 0, t, h), m_gridColor);
+            node->over->add(QRectF(w - t, 0, t, h), m_gridColor);
+        }
     }
 
     node->under->end();
@@ -445,7 +458,8 @@ void WaveformItem::mousePressEvent(QMouseEvent *e)
     if (m_zoom) {
         m_scrubbing = false;
         m_scrubFrom = m_deck->position();
-        setCursor(Qt::ClosedHandCursor);
+        if (!m_gridEdit)
+            setCursor(Qt::ClosedHandCursor);
         return;
     }
     m_dragging = false;
@@ -464,9 +478,18 @@ void WaveformItem::mouseMoveEvent(QMouseEvent *e)
         if (!m_scrubbing && std::abs(x - m_pressX) > 3.0)
             m_scrubbing = true;
         if (m_scrubbing) {
-            // the track moves with the hand: drag left to go forward
             const double span = m_zoomBeats * (g.valid() ? g.secPerBeat() : 0.5);
-            m_deck->setPreview(m_scrubFrom - (x - m_pressX) / std::max(1.0, width()) * span);
+            const double dsec = (x - m_pressX) / std::max(1.0, width()) * span;
+            if (m_gridEdit) {
+                // the grid moves with the hand, the music stays
+                if (g.valid()) {
+                    m_gridShift = dsec;
+                    update();
+                }
+            } else {
+                // the track moves with the hand: drag left to go forward
+                m_deck->setPreview(m_scrubFrom - dsec);
+            }
         }
         return;
     }
@@ -493,10 +516,18 @@ void WaveformItem::mouseReleaseEvent(QMouseEvent *e)
     m_pressed = false;
     setKeepMouseGrab(false);
     if (m_zoom) {
-        setCursor(Qt::OpenHandCursor);
+        setCursor(m_gridEdit ? Qt::SizeHorCursor : Qt::OpenHandCursor);
         if (m_scrubbing) {
             m_scrubbing = false;
-            m_deck->commitPreview();
+            if (m_gridEdit) {
+                const double shift = m_gridShift;
+                m_gridShift = 0.0;
+                if (shift != 0.0)
+                    m_deck->nudgeGrid(shift * 1000.0);
+                update();
+            } else {
+                m_deck->commitPreview();
+            }
         }
         return;
     }
@@ -510,4 +541,20 @@ void WaveformItem::mouseReleaseEvent(QMouseEvent *e)
     } else {
         m_deck->seek(secAtX(e->position().x()));
     }
+}
+
+void WaveformItem::mouseDoubleClickEvent(QMouseEvent *e)
+{
+    // grid edit: the beat nearest the click becomes a downbeat
+    if (!m_zoom || !m_gridEdit || !m_deck || !m_deck->buffer()) {
+        QQuickItem::mouseDoubleClickEvent(e);
+        return;
+    }
+    const BeatGrid g = m_deck->grid();
+    if (!g.valid())
+        return;
+    const double span = m_zoomBeats * g.secPerBeat();
+    const double sec = m_deck->position() + (e->position().x() / std::max(1.0, width()) - 0.5) * span;
+    m_deck->setDownbeatAt(g.secAtBeat(std::round(g.beatAtSec(sec))));
+    e->accept();
 }

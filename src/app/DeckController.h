@@ -164,6 +164,7 @@ public:
     Q_INVOKABLE void tap();
     Q_INVOKABLE void setDownbeatHere();
     Q_INVOKABLE void nudgeGrid(double ms);
+    Q_INVOKABLE void setDownbeatAt(double sec); // a bar line there, the grid kept
     Q_INVOKABLE void autoGrid(); // drop the manual grid, detect it again
 
     // key

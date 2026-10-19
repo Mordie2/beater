@@ -13,6 +13,8 @@ class DeckController;
 //  snapped to bars (add Alt/Option to snap to beats).
 //  Zoom mode: a window of N beats scrolling around the playhead. Drag it to
 //  move through the track the same way; the waveform follows the hand.
+//  gridEdit (zoom): dragging slides the beat grid under the music instead, and
+//  a double-click makes the beat there a downbeat.
 //
 // Drawn with the scene graph: the waveform is rendered once into textures
 // (the zoom one in tiles along the track) and each frame only moves them and
@@ -26,6 +28,7 @@ class WaveformItem : public QQuickItem {
     Q_PROPERTY(QColor color READ color WRITE setColor NOTIFY colorChanged)
     Q_PROPERTY(QColor gridColor MEMBER m_gridColor NOTIFY colorChanged)  // beat / phrase lines
     Q_PROPERTY(QColor loopColor MEMBER m_loopColor NOTIFY colorChanged)  // loop regions
+    Q_PROPERTY(bool gridEdit MEMBER m_gridEdit NOTIFY gridEditChanged)
 
 public:
     explicit WaveformItem(QQuickItem *parent = nullptr);
@@ -46,12 +49,14 @@ signals:
     void deckChanged();
     void zoomChanged();
     void colorChanged();
+    void gridEditChanged();
 
 protected:
     QSGNode *updatePaintNode(QSGNode *old, UpdatePaintNodeData *) override;
     void mousePressEvent(QMouseEvent *e) override;
     void mouseMoveEvent(QMouseEvent *e) override;
     void mouseReleaseEvent(QMouseEvent *e) override;
+    void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 private:
     double secAtX(double x) const;
@@ -63,6 +68,8 @@ private:
     QColor m_color = QColor(255, 90, 54);
     QColor m_gridColor = QColor(255, 255, 255);
     QColor m_loopColor = QColor(255, 255, 255);
+    bool m_gridEdit = false;
+    double m_gridShift = 0.0; // s, while the grid is being dragged
     int m_trackRev = 0; // bumped when the track changes, so cached textures go
 
     bool m_pressed = false;

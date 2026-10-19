@@ -2,8 +2,9 @@ import QtQuick
 import HighlighterUI
 
 // The track's loops as bars under the timeline, on the same scale: the intro,
-// the In / Out loop and the end loop. The one the deck loops right now is
-// solid, one that's armed is half lit, one that's off is dim.
+// the In / Out loop and the outro (end loop). The one the deck loops right now
+// is solid, one that's armed is half lit, one that's off is dim. With tags on,
+// each loop has a name tag under it; click it to switch that loop on or off.
 //  Drag an end to resize a loop, its middle to move it, or the empty lane to
 //  draw an In / Out loop. Double-click a loop to reset it (the intro and end
 //  back to automatic, the In / Out loop gone). Snaps to bars; Option for beats.
@@ -13,7 +14,11 @@ Item {
     property color accent: Look.loop
     readonly property color tint: accent
 
-    implicitHeight: Theme.s(18)
+    //! Name tags under the loops (click: on / off).
+    property bool tags: false
+    readonly property real laneHeight: tags ? Theme.s(16) : Theme.s(12)
+    readonly property real tagHeight: Theme.s(18)
+    implicitHeight: laneHeight + (tags ? Theme.s(3) + tagHeight : 0)
 
     readonly property bool ready: deck.loaded && deck.bpm > 0 && deck.duration > 0
     readonly property real handle: Theme.s(7)
@@ -31,7 +36,7 @@ Item {
     property real editA: 0
     property real editB: 0
 
-    Rectangle { anchors.fill: parent; color: Theme.well }
+    Rectangle { width: parent.width; height: lane.laneHeight; color: Theme.well }
 
     component Region: Rectangle {
         id: r
@@ -51,7 +56,7 @@ Item {
         visible: lane.ready && b > a
         x: lane.xAtBeat(a)
         width: Math.max(Theme.s(2), lane.xAtBeat(b) - x)
-        height: parent.height
+        height: lane.laneHeight
         z: active || editing ? 2 : kind === "custom" ? 1 : 0
         color: lane.tint
         opacity: editing || active ? 1 : armed ? 0.55 : 0.22
@@ -59,11 +64,12 @@ Item {
         Rectangle { width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(r.color) }
         Rectangle { x: parent.width - width; width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(r.color) }
         Text {
+            // without tags (Perform), the bar says what it is
             anchors.centerIn: parent
-            visible: implicitWidth < parent.width - 2 * lane.handle - Theme.s(4)
+            visible: !lane.tags && implicitWidth < parent.width - 2 * lane.handle - Theme.s(4)
             readonly property real beats: r.b - r.a
             readonly property string len: beats % 4 === 0 ? beats / 4 + (beats === 4 ? " bar" : " bars") : beats + " beats"
-            text: r.kind === "intro" ? "intro · " + len : r.kind === "end" ? "end · " + len : "in/out · " + len
+            text: r.kind === "intro" ? "intro · " + len : r.kind === "end" ? "outro · " + len : "in/out · " + len
             color: Theme.inkOf(r.color)
             font.family: Theme.family
             font.pixelSize: Theme.smallSize
@@ -80,14 +86,54 @@ Item {
         visible: lane.ready && lane.deck.customPending
         x: lane.xAtBeat(lane.deck.customStartBeat) - width / 2
         width: Theme.s(3)
-        height: parent.height
+        height: lane.laneHeight
         color: lane.tint
         z: 3
     }
 
+    // ---- name tags: solid while looping, outlined while armed, dim when off; click = on / off
+    component Tag: Rectangle {
+        id: t
+        required property var region
+        required property string text
+        readonly property bool on: region.active
+        readonly property bool armed: region.armed
+        visible: lane.tags && region.visible
+        y: lane.laneHeight + Theme.s(3)
+        x: Math.max(0, Math.min(lane.width - width, region.x))
+        width: label.implicitWidth + Theme.s(12)
+        height: lane.tagHeight
+        color: on ? lane.tint : "transparent"
+        border.width: 1
+        border.color: on || armed ? lane.tint : Theme.line
+        Text {
+            id: label
+            anchors.centerIn: parent
+            text: t.text
+            color: t.on ? Theme.inkOf(lane.tint) : t.armed ? lane.tint : Theme.textFaint
+            font.family: Theme.family
+            font.pixelSize: Theme.smallSize
+        }
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                const k = t.region.kind
+                if (k === "intro") lane.deck.introArmed = !lane.deck.introArmed
+                else if (k === "end") lane.deck.endArmed = !lane.deck.endArmed
+                else lane.deck.customOn = !lane.deck.customOn
+            }
+        }
+        z: 5
+    }
+    Tag { region: introRegion; text: "Intro" }
+    Tag { region: customRegion; text: "In / Out" }
+    Tag { region: endRegion; text: "Outro" }
+
     MouseArea {
         id: ma
-        anchors.fill: parent
+        width: parent.width
+        height: lane.laneHeight
         z: 4
         enabled: lane.ready
         hoverEnabled: true

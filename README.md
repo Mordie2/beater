@@ -39,6 +39,13 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
 - **Master tempo** is a fixed BPM you set (drag the number, scroll, ±, or double-click to type). Everything follows it.
 - **Sync** is on by default for each deck. A synced deck is time-stretched to the master tempo and phase-locked to the master grid (Rubber Band R3 engine, so pitch is untouched). Pressing play starts the deck immediately, already in phase: it jumps to the nearest position whose beat (or bar, with PHASE = BAR) matches the master.
 - **Key shift** in semitones, tempo stays locked. The key readout follows.
+- **A deck (Edit)**: the track, the big waveform, the timeline with the loop lane and its
+  tags, then one row: Play, Sync, In / Out / Loop, the loop length, the track's BPM (and
+  the BPM it plays at), ×2 / ÷2, key, key shift, and the pencil. Beneath it is space kept
+  for effects.
+- **Grid edit** (the pencil): the row becomes BPM, ×2 / ÷2, Tap, =M, grid nudge, Set 1,
+  Auto, and key. Drag the big waveform to slide the grid under the music; double-click a beat
+  to make it the 1. Done (or the pencil again) goes back.
 - **Moving around**: click or drag on the timeline (the overview under the big waveform) and
   the playhead follows; the deck jumps there when you let go, on the beat, or in phase with
   the master when it's synced and playing. The big waveform can be grabbed and dragged the
@@ -52,13 +59,14 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
     marks the end and the loop starts at once, jumping back to the In in phase. LOOP turns it
     off and back on (on again with the playhead past it jumps back in). HERE makes one of
     the chosen length from the current bar.
-  - **End**: its last N bars. Armed by default, so a track that runs out keeps looping its
+  - **Outro** (the end loop): its last N bars. Armed by default, so a track that runs out keeps looping its
     ending until you bring in the next one.
 
   In use: In / Out if on, else the intro if armed, else the end. A loop the playhead has
   left behind (seeked past it) releases itself, so the end loop always catches the track.
   The bar buttons set the length of the loop in use. The **loop lane** under the timeline
-  shows all three (in use solid, armed half lit, off dim): drag an end to resize, the middle
+  shows all three (in use solid, armed half lit, off dim), each with a tag under it (Intro,
+  In / Out, Outro; click a tag to switch that loop on or off): drag an end to resize, the middle
   to move, the empty lane to draw an In / Out loop (Shift-drag on the timeline does too);
   double-click a loop to reset it. Snaps to bars, hold Option for beats.
 - **Output**: OUTPUT at the top right (Edit mode) picks the audio device: System default or
