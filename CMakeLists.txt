@@ -83,20 +83,27 @@ qt_add_executable(beater
 )
 # qmltyperegistrar includes the QML_ELEMENT headers by bare file name
 target_include_directories(beater PRIVATE src/app)
+set(BEATER_QML
+    qml/Main.qml
+    qml/Theme.qml
+    qml/TopBar.qml
+    qml/DeckView.qml
+    qml/Playlist.qml
+    qml/Fader.qml
+    qml/Btn.qml
+    qml/Readout.qml
+)
+# Put the QML files at the module root so they see the module's C++ types.
+foreach(f IN LISTS BEATER_QML)
+    get_filename_component(n ${f} NAME)
+    set_source_files_properties(${f} PROPERTIES QT_RESOURCE_ALIAS ${n})
+endforeach()
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(beater
     URI Beater
     VERSION 1.0
-    QML_FILES
-        qml/Main.qml
-        qml/Theme.qml
-        qml/TopBar.qml
-        qml/DeckView.qml
-        qml/Playlist.qml
-        qml/Fader.qml
-        qml/Btn.qml
-        qml/Readout.qml
+    QML_FILES ${BEATER_QML}
     SOURCES
         src/app/TrackRecord.h
         src/app/Library.h
