@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSaveFile>
+#include <QSettings>
 #include <QStandardPaths>
 
 namespace {
@@ -51,6 +52,7 @@ Library::Library(QObject *parent)
     m_saveTimer.setSingleShot(true);
     m_saveTimer.setInterval(400);
     connect(&m_saveTimer, &QTimer::timeout, this, &Library::save);
+    m_camelot = QSettings().value("camelot", false).toBool();
     load();
     for (const QString &id : std::as_const(m_playlist))
         if (m_tracks[id].needsAnalysis())
@@ -63,6 +65,22 @@ Library::~Library()
     m_pool.waitForDone();
     if (m_saveTimer.isActive())
         save();
+}
+
+void Library::setCamelot(bool on)
+{
+    if (on == m_camelot)
+        return;
+    m_camelot = on;
+    QSettings().setValue("camelot", on);
+    if (!m_playlist.isEmpty())
+        emit dataChanged(index(0), index(int(m_playlist.size()) - 1), {KeyTextRole});
+    emit camelotChanged();
+}
+
+QString Library::keyText(int key) const
+{
+    return keys::valid(key) ? QString::fromStdString(keys::display(key, m_camelot)) : QString();
 }
 
 QStringList Library::audioExtensions()
@@ -86,10 +104,7 @@ QVariant Library::data(const QModelIndex &index, int role) const
     case PathRole: return r.path;
     case BpmRole: return r.bpm;
     case BpmTextRole: return r.bpm > 0 ? QString::number(r.bpm, 'f', r.bpm == std::round(r.bpm) ? 0 : 2) : QString();
-    case KeyTextRole:
-        return keys::valid(r.key)
-            ? QString::fromStdString(keys::camelot(r.key) + " " + keys::standardName(r.key))
-            : QString();
+    case KeyTextRole: return keyText(r.key);
     case DurationTextRole: return fmtTime(r.durationSec);
     case StatusRole: return r.status;
     case GridManualRole: return r.gridManual;

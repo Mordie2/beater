@@ -91,7 +91,7 @@ Panel {
             ParamText { text: "#"; caps: true; Layout.preferredWidth: Theme.s(36) }
             ParamText { text: "title"; caps: true; Layout.fillWidth: true }
             ParamText { text: "bpm"; caps: true; Layout.preferredWidth: Theme.s(76) }
-            ParamText { text: "key"; caps: true; Layout.preferredWidth: Theme.s(96) }
+            ParamText { text: "key"; caps: true; Layout.preferredWidth: Theme.s(64) }
             ParamText { text: "time"; caps: true; Layout.preferredWidth: Theme.s(60) }
             Item { Layout.preferredWidth: Theme.s(64) }
         }
@@ -188,11 +188,11 @@ Panel {
                         Layout.preferredWidth: root.compact ? Theme.s(44) : Theme.s(76)
                     }
                     ParamText {
-                        text: root.compact ? row.keyText.split(" ")[0] : row.keyText   // Camelot only when compact
+                        text: row.keyText
                         mono: true
                         small: root.compact
                         wrapMode: Text.NoWrap
-                        Layout.preferredWidth: root.compact ? Theme.s(36) : Theme.s(96)
+                        Layout.preferredWidth: root.compact ? Theme.s(40) : Theme.s(64)
                     }
                     ParamText {
                         visible: !root.compact

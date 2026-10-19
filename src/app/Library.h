@@ -16,6 +16,8 @@ class Library : public QAbstractListModel {
     QML_UNCREATABLE("Owned by AppController")
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(int analyzingCount READ analyzingCount NOTIFY analyzingCountChanged)
+    //! Keys as Camelot codes ("11A") instead of names ("F#m"). Remembered.
+    Q_PROPERTY(bool camelot READ camelot WRITE setCamelot NOTIFY camelotChanged)
 
 public:
     enum Roles {
@@ -39,6 +41,9 @@ public:
 
     int count() const { return int(m_playlist.size()); }
     int analyzingCount() const { return m_analyzing; }
+    bool camelot() const { return m_camelot; }
+    void setCamelot(bool on);
+    QString keyText(int key) const;
 
     Q_INVOKABLE void addUrls(const QList<QUrl> &urls);
     Q_INVOKABLE void removeAt(int row);
@@ -57,6 +62,7 @@ public:
 signals:
     void countChanged();
     void analyzingCountChanged();
+    void camelotChanged();
     void recordChanged(const QString &id);
 
 private:
@@ -73,4 +79,5 @@ private:
     QThreadPool m_pool;
     QTimer m_saveTimer;
     int m_analyzing = 0;
+    bool m_camelot = false;
 };

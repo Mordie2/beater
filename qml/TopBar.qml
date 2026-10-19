@@ -59,6 +59,17 @@ Item {
             }
         }
 
+        Column {
+            spacing: Theme.s(4)
+            ParamText { text: "keys"; caps: true; wrapMode: Text.NoWrap }
+            ParamChoice {
+                width: Theme.s(150)
+                model: ["Names", "Camelot"]
+                currentIndex: root.app.library.camelot ? 1 : 0
+                onActivated: i => root.app.library.camelot = i === 1
+            }
+        }
+
         Item { Layout.fillWidth: true }
 
         ParamText {

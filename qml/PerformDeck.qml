@@ -73,13 +73,20 @@ ParamPlate {
                 deck: root.deck
                 color: root.accent
             }
-            // the deck's level along the bottom edge
+            // the deck's level along the bottom edge (under the loop lane)
             Rectangle {
                 anchors.bottom: parent.bottom
                 height: Theme.s(2)
                 width: parent.width * Math.min(1, root.deck.level)
                 color: root.deck.level > 0.9 ? Theme.danger : root.accent
             }
+        }
+
+        LoopLane {
+            Layout.fillWidth: true
+            Layout.topMargin: -Theme.s(4)
+            implicitHeight: Theme.s(12)
+            deck: root.deck
         }
 
         RowLayout {

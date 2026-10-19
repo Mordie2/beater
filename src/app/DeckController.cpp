@@ -18,6 +18,7 @@ DeckController::DeckController(int index, AudioEngine *engine, Library *library,
 {
     m_engine->deck(m_index).volume.store(float(m_volume * m_volume));
     m_tapClock.start();
+    connect(m_library, &Library::camelotChanged, this, &DeckController::keyChanged);
 }
 
 double DeckController::beat() const
@@ -27,24 +28,19 @@ double DeckController::beat() const
 
 QString DeckController::keyText() const
 {
-    if (!keys::valid(m_rec.key))
-        return QString();
-    return QString::fromStdString(keys::camelot(m_rec.key) + " · " + keys::standardName(m_rec.key));
+    return m_library->keyText(m_rec.key);
 }
 
 QString DeckController::shiftedKeyText() const
 {
-    const int k = keys::transpose(m_rec.key, m_keyShift);
-    if (!keys::valid(k))
-        return QString();
-    return QString::fromStdString(keys::camelot(k) + " · " + keys::standardName(k));
+    return m_library->keyText(keys::transpose(m_rec.key, m_keyShift));
 }
 
 QStringList DeckController::keyNames() const
 {
     QStringList l;
     for (int k = 0; k < 24; ++k)
-        l << QString::fromStdString(keys::camelot(k) + "  " + keys::standardName(k));
+        l << m_library->keyText(k);
     return l;
 }
 
@@ -429,13 +425,17 @@ void DeckController::setLoopEnabled(bool on)
 void DeckController::setLoopBars(int bars)
 {
     bars = std::clamp(bars, 1, 64);
-    if (bars == m_loopBars)
-        return;
+    const bool changed = bars != m_loopBars;
     m_loopBars = bars;
-    emit loopBarsChanged();
-    if (m_rec.hasManualLoop()) {
+    if (changed)
+        emit loopBarsChanged();
+    // A drawn loop takes the length from its start, even when the bar count
+    // didn't change (it may have been dragged to some other length).
+    if (m_rec.hasManualLoop() && m_rec.loopEndBeat - m_rec.loopStartBeat != 4.0 * bars) {
         m_rec.loopEndBeat = m_rec.loopStartBeat + 4.0 * bars;
         commitRecord();
+    } else if (!changed) {
+        return;
     }
     computeLoop();
     sendLoop();

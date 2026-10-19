@@ -12,7 +12,7 @@ ApplicationWindow {
     visible: true
     title: "beater"
     color: Theme.page
-    minimumWidth: perform ? Theme.s(360) : 1200
+    minimumWidth: perform ? Theme.s(360) : Theme.s(1100)
     minimumHeight: perform ? Theme.s(480) : 720
     flags: perform && prefs.onTop ? (Qt.Window | Qt.WindowStaysOnTopHint) : Qt.Window
 

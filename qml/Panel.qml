@@ -16,7 +16,9 @@ Item {
     Item {
         id: head
         width: parent.width
-        height: Theme.s(30)
+        // no title, no header row
+        height: root.title.length || root.note.length || tools.children.length ? Theme.s(30) : 0
+        visible: height > 0
         Text {
             id: titleText
             anchors.verticalCenter: parent.verticalCenter

@@ -41,6 +41,7 @@ class DeckController : public QObject {
     Q_PROPERTY(int keyShift READ keyShift WRITE setKeyShift NOTIFY keyChanged)
     Q_PROPERTY(QString keyText READ keyText NOTIFY keyChanged)
     Q_PROPERTY(QString shiftedKeyText READ shiftedKeyText NOTIFY keyChanged)
+    Q_PROPERTY(QStringList keyNames READ keyNames NOTIFY keyChanged) // 24 entries, index = key
 
     Q_PROPERTY(bool sync READ sync WRITE setSync NOTIFY syncChanged)
     Q_PROPERTY(bool loopEnabled READ loopEnabled WRITE setLoopEnabled NOTIFY loopChanged)
@@ -129,7 +130,7 @@ public:
     // key
     Q_INVOKABLE void setKey(int key);
     Q_INVOKABLE void autoKey(); // drop the manual key, detect it again
-    Q_INVOKABLE QStringList keyNames() const; // 24 entries, index = key
+    QStringList keyNames() const;
 
     // loops (beats on the track grid)
     Q_INVOKABLE void setLoopBeats(double startBeat, double endBeat);

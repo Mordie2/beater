@@ -29,8 +29,9 @@ that mode.
 
 ## How it works
 
-- **Edit and Perform modes** (switch at the top, or ⌘E). Edit has everything: waveforms,
-  loops, grid / BPM / key editing, the mixer, the full playlist. Perform is a narrow column
+- **Edit and Perform modes** (switch at the top, or ⌘E). Edit has everything: the decks
+  stacked full width (big waveforms), loops, grid / BPM / key editing, and beside them the
+  mixer and the playlist. Perform is a narrow column
   to keep open next to Resolume: master tempo, per deck the overview, play / sync / loop,
   key, BPM and volume, then the master fader and the playlist. **Pin** keeps it above other
   windows. Each mode remembers its own window size.
@@ -44,7 +45,8 @@ that mode.
   same way.
 - **Loading**: drag a track from the playlist onto a deck (in either mode), double-click it,
   or press A / B. Over a playing deck the drop target turns red: it replaces that track.
-- **Loops**: every track has a loop region. By default it is the last N bars (END), so a track that runs out keeps looping its ending until you bring the next one in. Shift-drag across the timeline to set your own region (snaps to bars, add Option to snap to beats), or use HERE to loop N bars from the current bar. LOOP toggles looping on the deck.
+- **Loops**: every track has a loop region. By default it is the last N bars (END), so a track that runs out keeps looping its ending until you bring the next one in. The **loop lane** under the timeline shows the region as a bar: drag an end to resize it, the middle to move it, or the empty lane to draw a new one (snaps to bars, hold Option for beats). The bar buttons set its length from its start, HERE loops N bars from the current bar, END goes back to the automatic end loop. Shift-drag on the timeline draws one too.
+- **Keys** show as names (F#m) by default; KEYS at the top switches to Camelot (11A). LOOP toggles looping on the deck.
 - **Volume**: a fader per deck plus master. No automatic transitions.
 - **Analysis**: BPM, beat grid and key are detected on import (tracks analyzed by an older
   build are analyzed again once). Everything is editable: click the BPM to type it, ×2 / ÷2,

@@ -36,4 +36,10 @@ inline std::string camelot(int k)
     return std::to_string(n) + (isMinor(k) ? "A" : "B");
 }
 
+// What the UI shows: the standard name ("F#m"), or the Camelot code ("11A").
+inline std::string display(int k, bool useCamelot)
+{
+    return useCamelot ? camelot(k) : standardName(k);
+}
+
 } // namespace keys
