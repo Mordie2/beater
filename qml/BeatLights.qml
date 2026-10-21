@@ -4,7 +4,6 @@ import HighlighterUI
 // Where the master clock is in the bar: the lit square walks 1-2-3-4.
 Row {
     id: root
-    property color accent: Look.tempo
     required property AppController app
     property real size: Theme.s(18)
     spacing: Theme.s(4)

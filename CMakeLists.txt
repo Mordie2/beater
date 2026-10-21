@@ -105,6 +105,7 @@ set(BEATER_QML
     qml/DeckDrop.qml
     qml/LoopLane.qml
     qml/Crossfader.qml
+    qml/DeckClock.qml
 )
 # Put the QML files at the module root so they see the module's C++ types.
 foreach(f IN LISTS BEATER_QML)

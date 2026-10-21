@@ -93,6 +93,10 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
   engine keeps its rate and miniaudio converts). If the device goes away the app plays
   through the default meanwhile and goes back when it returns; a device whose clock stalls
   is reopened.
+- **Look**: HighlighterUI's "hardware" skin: a warm grey faceplate, dark screens for the
+  waveforms and values, and whatever is on glows. Orange is the main glow and deck A, cyan is
+  deck B; everything in a deck lights up in its colour. The master tempo and the deck clocks
+  are reflective LCDs.
 - **Keys** show as names (F#m) by default; KEYS at the top switches to Camelot (11A). LOOP toggles looping on the deck.
 - **Volume**: a fader per deck plus master. No automatic transitions.
 - **Analysis**: BPM, beat grid and key are detected on import (tracks analyzed by an older

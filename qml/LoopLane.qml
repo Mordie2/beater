@@ -11,8 +11,7 @@ import HighlighterUI
 Item {
     id: lane
     required property DeckController deck
-    property color accent: Look.loop
-    readonly property color tint: accent
+    readonly property color tint: Theme.accentAt(lane, Window.window)   // the deck's
 
     //! Name tags under the loops (click: on / off).
     property bool tags: false

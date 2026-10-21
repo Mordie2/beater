@@ -50,7 +50,8 @@ ApplicationWindow {
     onMinimumHeightChanged: if (height < minimumHeight) height = minimumHeight
 
     Component.onCompleted: {
-        Theme.accent = Look.neutral   // the app's own controls; colour means a kind of control (Look)
+        Theme.skin = "hardware"
+        Theme.accent = Look.deckA     // the main glow: the app's own controls
         Theme.slidersStartMinimised = false   // volume faders want the full bar
         width = perform ? prefs.performWidth : prefs.editWidth
         height = perform ? prefs.performHeight : prefs.editHeight

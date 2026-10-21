@@ -35,9 +35,8 @@ Item {
         Item { Layout.fillWidth: true }
 
         Column {
-            property color accent: Look.tempo
             spacing: Theme.s(4)
-            ParamText { text: "master bpm"; caps: true; wrapMode: Text.NoWrap; color: Look.label(Look.tempo) }
+            ParamText { text: " "; caps: true; wrapMode: Text.NoWrap }   // the LCD has its own label
             Row {
                 spacing: Theme.s(4)
                 ParamButton { text: "−1"; onClicked: root.app.nudgeMasterBpm(-1); anchors.verticalCenter: parent.verticalCenter }
@@ -49,16 +48,14 @@ Item {
         }
 
         Column {
-            property color accent: Look.tempo
             spacing: Theme.s(4)
-            ParamText { text: "bar"; caps: true; wrapMode: Text.NoWrap; color: Look.label(Look.tempo) }
+            ParamText { text: "bar"; caps: true; wrapMode: Text.NoWrap }
             BeatLights { app: root.app }
         }
 
         Column {
-            property color accent: Look.tempo
             spacing: Theme.s(4)
-            ParamText { text: "phase lock"; caps: true; wrapMode: Text.NoWrap; color: Look.label(Look.tempo) }
+            ParamText { text: "phase lock"; caps: true; wrapMode: Text.NoWrap }
             ParamChoice {
                 width: Theme.s(110)
                 model: ["Beat", "Bar"]

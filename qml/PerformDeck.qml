@@ -57,20 +57,17 @@ ParamPlate {
                 elide: Text.ElideRight
             }
             ParamText {
-                // key (rose, the shifted key when shifted) and tempo (blood orange), at a glance
-                text: "<font color='" + Look.key + "'>" + (root.deck.keyShift !== 0 ? root.deck.shiftedKeyText : root.deck.keyText) + "</font>"
-                      + (root.deck.bpm > 0 ? "&nbsp;&nbsp;&nbsp;<font color='" + Look.tempo + "'>" + root.deck.bpm.toFixed(1) + "</font>" : "")
-                textFormat: Text.RichText
+                // key (the shifted key when shifted) and tempo, at a glance
+                text: (root.deck.keyShift !== 0 ? root.deck.shiftedKeyText : root.deck.keyText)
+                      + (root.deck.bpm > 0 ? "   " + root.deck.bpm.toFixed(1) : "")
+                color: Theme.textDim
                 mono: true
                 small: true
                 wrapMode: Text.NoWrap
             }
-            ParamText {
+            DeckClock {
                 visible: root.deck.loaded
-                text: "−" + root.fmt(root.deck.duration - root.deck.position)
-                mono: true
-                small: true
-                wrapMode: Text.NoWrap
+                deck: root.deck
             }
         }
 
@@ -84,7 +81,7 @@ ParamPlate {
                 deck: root.deck
                 color: root.accent
                 gridColor: Look.grid
-                loopColor: Look.loop
+                loopColor: Look.neutral
             }
             // the deck's level along the bottom edge (under the loop lane)
             Rectangle {
@@ -105,7 +102,6 @@ ParamPlate {
         RowLayout {
             spacing: Theme.s(4)
             RowLayout {
-                property color accent: Look.transport   // play / pause: the state you're in is solid
                 spacing: Theme.s(3)
                 ParamButton {
                     // paused: play from here; playing: again from the start
@@ -124,7 +120,6 @@ ParamPlate {
                 }
             }
             RowLayout {
-                property color accent: Look.tempo       // sky: sync
                 ParamButton {
                     text: "Sync"
                     horizontalPadding: Theme.s(7)
@@ -134,7 +129,6 @@ ParamPlate {
                 }
             }
             RowLayout {
-                property color accent: Look.loop        // amber: intro · in / out · end
                 spacing: Theme.s(3)
                 ParamButton {
                     text: "Intro"

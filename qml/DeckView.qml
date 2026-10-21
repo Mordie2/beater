@@ -102,11 +102,9 @@ Panel {
                 wrapMode: Text.NoWrap
                 elide: Text.ElideRight
             }
-            ParamText {
+            DeckClock {
                 visible: root.deck.loaded
-                text: root.fmt(root.deck.position) + "  −" + root.fmt(root.deck.duration - root.deck.position)
-                mono: true
-                wrapMode: Text.NoWrap
+                deck: root.deck
             }
         }
 
@@ -124,7 +122,7 @@ Panel {
                 zoomBeats: 16
                 color: root.accent
                 gridColor: Look.grid
-                loopColor: Look.loop
+                loopColor: Look.neutral
                 gridEdit: root.gridEdit
             }
             // phase error vs master (only meaningful with sync on)
@@ -134,7 +132,7 @@ Panel {
                 x: parent.width / 2 + root.deck.phaseError * parent.width / 16 - 1
                 width: 3
                 height: 4
-                color: Math.abs(root.deck.phaseError) < 0.02 ? Look.good : Look.warn
+                color: Math.abs(root.deck.phaseError) < 0.02 ? root.accent : Look.warn
             }
         }
 
@@ -151,7 +149,7 @@ Panel {
                     deck: root.deck
                     color: root.accent
                     gridColor: Look.grid
-                    loopColor: Look.loop
+                    loopColor: Look.neutral
                 }
             }
             LoopLane {
@@ -176,7 +174,6 @@ Panel {
 
                 RowLayout {
                     // the state you're in is the solid one
-                    property color accent: Look.transport
                     spacing: Theme.s(4)
                     Btn {
                         // paused: play from here; playing: again from the start
@@ -196,7 +193,6 @@ Panel {
                 }
                 Gap {}
                 RowLayout {
-                    property color accent: Look.tempo
                     Btn {
                         text: "Sync"
                         checkable: true
@@ -206,7 +202,6 @@ Panel {
                 }
                 Gap {}
                 RowLayout {
-                    property color accent: Look.loop
                     spacing: Theme.s(4)
                     Btn {
                         text: "In"
@@ -241,13 +236,11 @@ Panel {
                 }
                 Gap {}
                 RowLayout {
-                    property color accent: Look.tempo
                     spacing: Theme.s(4)
                     Label {
                         id: bpmLabel
                         Layout.maximumWidth: root.dropped(bpmLabel) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(bpmLabel) ? 0 : (enabled ? 1 : 0.4)
                         text: root.deck.analyzing ? "bpm …" : root.deck.gridManual ? "bpm *" : "bpm"
-                        color: Look.label(Look.tempo)
                     }
                     ParamValueBox {
                         // click to type, Up / Down step 0.01 (Shift 1)
@@ -266,7 +259,7 @@ Panel {
                         id: playingBpm
                         Layout.maximumWidth: root.dropped(playingBpm) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(playingBpm) ? 0 : (enabled ? 1 : 0.4)
                         text: root.deck.playingBpm > 0 ? "→ " + root.deck.playingBpm.toFixed(2) : ""
-                        color: Look.tempo
+                        color: root.accent
                         mono: true
                         wrapMode: Text.NoWrap
                         Layout.preferredWidth: widest.width
@@ -277,9 +270,8 @@ Panel {
                 }
                 Gap {}
                 RowLayout {
-                    property color accent: Look.key
                     spacing: Theme.s(4)
-                    Label { text: root.deck.analyzing ? "key …" : root.deck.keyManual ? "key *" : "key"; color: Look.label(Look.key) }
+                    Label { text: root.deck.analyzing ? "key …" : root.deck.keyManual ? "key *" : "key" }
                     ParamCombo {
                         Layout.preferredWidth: Theme.s(84)
                         enabled: root.deck.loaded
@@ -289,7 +281,7 @@ Panel {
                     }
                     Btn { id: keyAuto; Layout.maximumWidth: root.dropped(keyAuto) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(keyAuto) ? 0 : (enabled ? 1 : 0.4); text: "Auto"; enabled: root.deck.keyManual && !root.deck.analyzing; onClicked: root.deck.autoKey() }
                     Gap {}
-                    Label { id: shiftLabel; Layout.maximumWidth: root.dropped(shiftLabel) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(shiftLabel) ? 0 : (enabled ? 1 : 0.4); text: "shift"; color: Look.label(Look.key) }
+                    Label { id: shiftLabel; Layout.maximumWidth: root.dropped(shiftLabel) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(shiftLabel) ? 0 : (enabled ? 1 : 0.4); text: "shift" }
                     Btn { text: "−"; implicitWidth: Theme.s(26); enabled: root.deck.keyShift > -12; onClicked: root.deck.keyShift = root.deck.keyShift - 1 }
                     ParamValueBox {
                         Layout.alignment: Qt.AlignVCenter
@@ -305,7 +297,7 @@ Panel {
                         // the key it plays in now, when shifted; as wide as the widest key name
                         id: shiftedKey
                         text: root.deck.keyShift !== 0 && root.deck.key >= 0 ? "→ " + root.deck.shiftedKeyText : ""
-                        color: Look.key
+                        color: root.accent
                         mono: true
                         wrapMode: Text.NoWrap
                         Layout.preferredWidth: widestKey.width
@@ -314,7 +306,6 @@ Panel {
                 }
                 Item { Layout.fillWidth: true }
                 RowLayout {
-                    property color accent: Look.tempo   // the grid, BPM and key
                     Btn {
                         objectName: "gridEditButton"
                         icon: "✎"
@@ -333,9 +324,8 @@ Panel {
                 spacing: Theme.s(4)
 
                 RowLayout {
-                    property color accent: Look.tempo
                     spacing: Theme.s(4)
-                    Label { text: "bpm"; color: Look.label(Look.tempo) }
+                    Label { text: "bpm" }
                     ParamValueBox {
                         Layout.alignment: Qt.AlignVCenter
                         value: root.deck.bpm
@@ -351,7 +341,7 @@ Panel {
                     Btn { text: "Tap"; onClicked: root.deck.tap() }
                     Btn { text: "=M"; enabled: root.deck.bpm > 0; onClicked: root.app.matchMasterTo(root.deck.index) }
                     Gap {}
-                    Label { text: "grid"; color: Look.label(Look.tempo) }
+                    Label { text: "grid" }
                     Btn { icon: "◀"; implicitWidth: Theme.s(28); enabled: root.deck.bpm > 0; onClicked: root.deck.nudgeGrid(-5) }
                     Btn { icon: "▶"; implicitWidth: Theme.s(28); enabled: root.deck.bpm > 0; onClicked: root.deck.nudgeGrid(5) }
                     Btn { text: "Set 1"; enabled: root.deck.bpm > 0; onClicked: root.deck.setDownbeatHere() }
@@ -360,9 +350,8 @@ Panel {
                 }
                 Gap {}
                 RowLayout {
-                    property color accent: Look.key
                     spacing: Theme.s(4)
-                    Label { text: "key"; color: Look.label(Look.key) }
+                    Label { text: "key" }
                     ParamCombo {
                         Layout.preferredWidth: Theme.s(84)
                         model: root.deck.keyNames
@@ -383,7 +372,6 @@ Panel {
                     Layout.leftMargin: Theme.s(10)
                 }
                 RowLayout {
-                    property color accent: Look.tempo
                     Btn {
                         // back to playing
                         icon: "✎"

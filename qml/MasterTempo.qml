@@ -1,31 +1,26 @@
 import QtQuick
 import HighlighterUI
 
-// The master BPM on a seven-segment screen: drag up / down (Shift: fine),
-// scroll, or double-click to type (Up / Down step it while typing).
-Rectangle {
+// The master BPM on a reflective LCD: drag up / down (Shift: fine), scroll,
+// or double-click to type (Up / Down step it while typing).
+ParamLCD {
     id: root
     required property AppController app
     property real digitHeight: Theme.s(30)
-
-    implicitWidth: lcd.width + Theme.s(20)
-    implicitHeight: lcd.height + Theme.s(12)
-    color: Theme.screen
-    border.width: 1
-    border.color: mouse.pressed || typed.editing ? Look.tempo : Theme.line
+    label: "master bpm"
 
     ParamSevenSeg {
         id: lcd
-        anchors.centerIn: parent
         visible: !typed.editing
         digits: 5
         digitHeight: root.digitHeight
-        ink: Look.tempo
         text: root.app.masterBpm.toFixed(2)
+        ink: Theme.lcdInk
+        ghost: Theme.lcdGhost
     }
     ParamValueBox {
         id: typed
-        anchors.centerIn: parent
+        anchors.centerIn: lcd
         opacity: editing ? 1 : 0
         value: root.app.masterBpm
         decimals: 2
@@ -36,6 +31,8 @@ Rectangle {
     }
     MouseArea {
         id: mouse
+        // the whole LCD, not just the digits
+        parent: root
         anchors.fill: parent
         enabled: !typed.editing
         cursorShape: Qt.SizeVerCursor
