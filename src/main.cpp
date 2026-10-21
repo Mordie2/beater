@@ -16,7 +16,7 @@
 //                         the window ignores real clicks and focus
 //  BEATER_AUTOPLAY=1      load playlist rows 0 and 1 into decks A and B, play, log deck state
 //  BEATER_SNAPSHOT=x.png  save a grab of the window after a few seconds, then quit
-//  BEATER_MODE=perform    start in perform (or edit) mode
+//  BEATER_MODE=column     start in that mode: edit, column or strip (perform = column)
 //  BEATER_FPS=1           log frames per second and the time spent painting waveforms
 //  BEATER_SIZE=WxH        start at this window size (never below the view's minimum)
 static void installDebugHooks(QQmlApplicationEngine &engine, AppController &controller)
@@ -52,7 +52,7 @@ static void installDebugHooks(QQmlApplicationEngine &engine, AppController &cont
     }
     const QString mode = qEnvironmentVariable("BEATER_MODE");
     if (!mode.isEmpty() && !engine.rootObjects().isEmpty())
-        QMetaObject::invokeMethod(engine.rootObjects().first(), "setMode", Q_ARG(QVariant, mode == "perform"));
+        QMetaObject::invokeMethod(engine.rootObjects().first(), "setMode", Q_ARG(QVariant, mode == "perform" ? QStringLiteral("column") : mode));
     const QStringList size = qEnvironmentVariable("BEATER_SIZE").split('x');
     if (size.size() == 2 && !engine.rootObjects().isEmpty()) {
         if (auto *w = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {

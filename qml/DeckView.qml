@@ -247,7 +247,7 @@ Panel {
                         visible: root.deck.bpm > 0
                         Layout.alignment: Qt.AlignVCenter
                         value: root.deck.bpm
-                        decimals: 2
+                        decimals: Look.bpmDecimals(root.deck.bpm)
                         interactive: root.deck.loaded
                         fontSize: Theme.s(15)
                         boxHeight: Theme.s(26)
@@ -258,7 +258,7 @@ Panel {
                         // the BPM it plays at; as wide as its widest value, so it never cuts
                         id: playingBpm
                         Layout.maximumWidth: root.dropped(playingBpm) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(playingBpm) ? 0 : (enabled ? 1 : 0.4)
-                        text: root.deck.playingBpm > 0 ? "→ " + root.deck.playingBpm.toFixed(2) : ""
+                        text: root.deck.playingBpm > 0 ? "→ " + Look.fmtBpm(root.deck.playingBpm) : ""
                         color: root.accent
                         mono: true
                         wrapMode: Text.NoWrap
@@ -329,7 +329,7 @@ Panel {
                     ParamValueBox {
                         Layout.alignment: Qt.AlignVCenter
                         value: root.deck.bpm
-                        decimals: 2
+                        decimals: Look.bpmDecimals(root.deck.bpm)
                         interactive: root.deck.loaded
                         fontSize: Theme.s(15)
                         boxHeight: Theme.s(26)

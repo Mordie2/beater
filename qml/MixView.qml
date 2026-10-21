@@ -88,13 +88,15 @@ Panel {
                     onMoved: v => root.app.masterVolume = v / 100
                 }
             }
-        }
 
-        Crossfader {
-            app: root.app
-            key: "mix.crossfader"
-            Layout.fillWidth: true
-            aspect: 4
+            // standing up, as tall as the faders
+            Crossfader {
+                app: root.app
+                key: "mix.crossfader"
+                Layout.preferredWidth: Theme.s(52)
+                Layout.alignment: Qt.AlignTop
+                aspect: Theme.s(52) / Math.max(Theme.s(80), faders.implicitHeight)
+            }
         }
     }
 }

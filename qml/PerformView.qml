@@ -2,17 +2,19 @@ import QtQuick
 import QtQuick.Layouts
 import HighlighterUI
 
-// The compact column to keep open next to Resolume: master tempo, both decks'
-// essentials, master volume and the playlist to load the next track.
+// Perform, as a column to keep beside Resolume: master tempo, both decks'
+// essentials with the crossfader standing beside them (A above, B below, as
+// the decks are), the master volume and the library.
 Item {
     id: root
     required property AppController app
     property bool onTop: false
-    signal editRequested()
-    //! The smallest window that shows everything uncut.
-    readonly property real minWidth: 2 * Theme.s(8) + Math.max(header.implicitWidth, deckA.minWidth, deckB.minWidth)
-    readonly property real minHeight: 2 * Theme.s(8) + column.implicitHeight + Theme.s(120)
+    signal modeRequested(string mode)
     signal onTopToggled(bool on)
+    //! The smallest window that shows everything uncut.
+    readonly property real minWidth: 2 * Theme.s(8) + Math.max(header.implicitWidth,
+                                         Math.max(deckA.minWidth, deckB.minWidth) + Theme.s(8) + Theme.s(48))
+    readonly property real minHeight: 2 * Theme.s(8) + column.implicitHeight + Theme.s(120)
 
     ColumnLayout {
         id: column
@@ -24,7 +26,6 @@ Item {
             id: header
             spacing: Theme.s(8)
             MasterTempo {
-                // sky: tempo
                 app: root.app
                 digitHeight: Theme.s(20)
             }
@@ -43,25 +44,39 @@ Item {
                 onToggled: v => root.onTopToggled(v)
             }
             ModeSwitch {
-                Layout.preferredWidth: Theme.s(116)
-                perform: true
-                onSwitched: p => { if (!p) root.editRequested() }
+                mode: "column"
+                onSwitched: m => root.modeRequested(m)
             }
         }
 
-        PerformDeck {
-            id: deckA
-            app: root.app
-            deck: root.app.deckA
-            accent: Look.deckA
-            Layout.fillWidth: true
-        }
-        PerformDeck {
-            id: deckB
-            app: root.app
-            deck: root.app.deckB
-            accent: Look.deckB
-            Layout.fillWidth: true
+        RowLayout {
+            spacing: Theme.s(8)
+            ColumnLayout {
+                id: decks
+                Layout.fillWidth: true
+                spacing: Theme.s(8)
+                PerformDeck {
+                    id: deckA
+                    app: root.app
+                    deck: root.app.deckA
+                    accent: Look.deckA
+                    Layout.fillWidth: true
+                }
+                PerformDeck {
+                    id: deckB
+                    app: root.app
+                    deck: root.app.deckB
+                    accent: Look.deckB
+                    Layout.fillWidth: true
+                }
+            }
+            Crossfader {
+                app: root.app
+                key: "perform.crossfader"
+                Layout.preferredWidth: Theme.s(48)
+                Layout.alignment: Qt.AlignTop
+                aspect: Theme.s(48) / Math.max(Theme.s(80), decks.implicitHeight)
+            }
         }
 
         ParamSlider {
@@ -76,13 +91,6 @@ Item {
             defaultValue: 85
             value: Math.round(root.app.masterVolume * 100)
             onMoved: v => root.app.masterVolume = v / 100
-        }
-
-        Crossfader {
-            app: root.app
-            key: "perform.crossfader"
-            Layout.fillWidth: true
-            aspect: 7
         }
 
         LibraryPanel {

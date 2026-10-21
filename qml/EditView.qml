@@ -7,7 +7,7 @@ import HighlighterUI
 Item {
     id: root
     required property AppController app
-    signal performRequested()
+    signal modeRequested(string mode)
     //! The smallest window that shows everything uncut.
     readonly property real minWidth: 2 * Theme.s(12) + Math.max(topBar.minWidth, deckA.minWidth + Theme.s(12) + Theme.s(300))
     readonly property real minHeight: 2 * Theme.s(12) + topBar.implicitHeight + Theme.s(12)
@@ -23,7 +23,7 @@ Item {
             id: topBar
             app: root.app
             Layout.fillWidth: true
-            onPerformRequested: root.performRequested()
+            onModeRequested: m => root.modeRequested(m)
         }
 
         RowLayout {

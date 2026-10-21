@@ -7,7 +7,9 @@ ApplicationWindow {
     id: window
     required property AppController app
 
-    readonly property bool perform: prefs.perform
+    //! "edit", or one of the two Perform layouts: "column" or "strip".
+    readonly property string mode: prefs.mode
+    readonly property bool perform: mode !== "edit"
     //! Test runs (BEATER_TEST): the window takes no clicks or focus, so it
     //! can't catch input meant for the windows around it.
     property bool inert: false
@@ -25,24 +27,35 @@ ApplicationWindow {
     Settings {
         id: prefs
         category: "window"
-        property bool perform: false
+        property string mode: "edit"
+        property string lastPerform: "column" // where ⌘E goes from Edit
         property bool onTop: false
         property int editWidth: 1440
         property int editHeight: 900
-        property int performWidth: 400
+        property int performWidth: 400     // the column
         property int performHeight: 760
+        property int stripWidth: 1600
+        property int stripHeight: 240
     }
 
     function rememberSize() {
-        if (perform) { prefs.performWidth = width; prefs.performHeight = height }
+        if (mode === "column") { prefs.performWidth = width; prefs.performHeight = height }
+        else if (mode === "strip") { prefs.stripWidth = width; prefs.stripHeight = height }
         else { prefs.editWidth = width; prefs.editHeight = height }
     }
-    function setMode(p) {
-        if (p === perform) return
+    function applySize() {
+        width = mode === "column" ? prefs.performWidth : mode === "strip" ? prefs.stripWidth : prefs.editWidth
+        height = mode === "column" ? prefs.performHeight : mode === "strip" ? prefs.stripHeight : prefs.editHeight
+    }
+    //! m: "edit", "column", "strip" (true / false: Perform / Edit, as the test hook says)
+    function setMode(m) {
+        if (m === true || m === "perform") m = prefs.lastPerform
+        if (m === false) m = "edit"
+        if (m === mode || ["edit", "column", "strip"].indexOf(m) < 0) return
         rememberSize()
-        prefs.perform = p
-        width = p ? prefs.performWidth : prefs.editWidth
-        height = p ? prefs.performHeight : prefs.editHeight
+        prefs.mode = m
+        if (m !== "edit") prefs.lastPerform = m
+        applySize()
     }
 
     // A window from before the minimum grew (a remembered size, a new control) grows with it.
@@ -52,27 +65,27 @@ ApplicationWindow {
     Component.onCompleted: {
         Theme.skin = "hardware"
         Theme.accent = Look.deckA     // the main glow: the app's own controls
+        app.library.camelot = false   // keys as names, always
         Theme.slidersStartMinimised = false   // volume faders want the full bar
-        width = perform ? prefs.performWidth : prefs.editWidth
-        height = perform ? prefs.performHeight : prefs.editHeight
+        applySize()
     }
     onClosing: rememberSize()
 
     Shortcut {
         sequence: "Ctrl+E"   // ⌘E on macOS
-        onActivated: window.setMode(!window.perform)
+        onActivated: window.setMode(window.perform ? "edit" : prefs.lastPerform)
     }
 
     Loader {
         id: view
         anchors.fill: parent
-        sourceComponent: window.perform ? performView : editView
+        sourceComponent: window.mode === "column" ? performView : window.mode === "strip" ? stripView : editView
     }
     Component {
         id: editView
         EditView {
             app: window.app
-            onPerformRequested: window.setMode(true)
+            onModeRequested: m => window.setMode(m)
         }
     }
     Component {
@@ -80,7 +93,16 @@ ApplicationWindow {
         PerformView {
             app: window.app
             onTop: prefs.onTop
-            onEditRequested: window.setMode(false)
+            onModeRequested: m => window.setMode(m)
+            onOnTopToggled: on => prefs.onTop = on
+        }
+    }
+    Component {
+        id: stripView
+        PerformStrip {
+            app: window.app
+            onTop: prefs.onTop
+            onModeRequested: m => window.setMode(m)
             onOnTopToggled: on => prefs.onTop = on
         }
     }

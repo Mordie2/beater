@@ -29,7 +29,9 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
 
 ## How it works
 
-- **Edit and Perform modes** (switch at the top, or ⌘E). Edit has everything: the decks
+- **Edit and two Perform layouts** (Edit / Column / Strip at the top; ⌘E flips between Edit
+  and the Perform layout used last). Column is tall and narrow, Strip wide and short, to see
+  which sits better next to Resolume; each remembers its own window size. Edit has everything: the decks
   stacked full width (big waveforms), loops, grid / BPM / key editing, and beside them the
   mixer and the playlist. Perform is a narrow column
   to keep open next to Resolume: master tempo, per deck the overview, play / sync / loop,
@@ -67,9 +69,10 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
   playlist open, files you drop or add go into it too, and ⌫ takes one out; in All tracks, +
   puts a track in the playlist you opened last, and ⌫ removes it from the library. It all
   lives in library.json, the open view too.
-- **Crossfader**: the XY pad in the mix (and in Perform). Left is A, right is B; in the middle
-  both play at their faders, and towards one side the other fades out. Only x counts for now
-  (y is kept for four decks). Double-click recentres it.
+- **Crossfader**: the XY pad standing up, next to the faders (and beside / between the decks
+  in Perform). A at the top, B at the bottom; in the middle both play at their faders, and
+  towards one end the other fades out. Only y counts for now (x is kept for four decks).
+  Double-click recentres it.
 - **Loops**: every track has three, and the deck loops one at a time:
   - **Intro**: its first N bars (8 by default). A loaded track starts with INTRO armed, so
     play loops the intro until you release it.
@@ -94,10 +97,10 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
   through the default meanwhile and goes back when it returns; a device whose clock stalls
   is reopened.
 - **Look**: HighlighterUI's "hardware" skin: a warm grey faceplate, dark screens for the
-  waveforms and values, and whatever is on glows. Orange is the main glow and deck A, cyan is
-  deck B; everything in a deck lights up in its colour. The master tempo and the deck clocks
+  waveforms and values, and whatever is on glows. Orange is the main glow and deck A, a pink-red
+  neon is deck B; everything in a deck lights up in its colour. The master tempo and the deck clocks
   are reflective LCDs.
-- **Keys** show as names (F#m) by default; KEYS at the top switches to Camelot (11A). LOOP toggles looping on the deck.
+- **Keys** show as names (F#m). BPMs show as whole numbers unless they have decimals. LOOP toggles looping on the deck.
 - **Volume**: a fader per deck plus master. No automatic transitions.
 - **Analysis**: BPM, beat grid and key are detected on import (tracks analyzed by an older
   build are analyzed again once). Everything is editable: click the BPM to type it, ×2 / ÷2,

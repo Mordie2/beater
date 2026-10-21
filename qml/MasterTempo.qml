@@ -14,7 +14,7 @@ ParamLCD {
         visible: !typed.editing
         digits: 5
         digitHeight: root.digitHeight
-        text: root.app.masterBpm.toFixed(2)
+        text: Look.fmtBpm(root.app.masterBpm)
         ink: Theme.lcdInk
         ghost: Theme.lcdGhost
     }
@@ -23,7 +23,7 @@ ParamLCD {
         anchors.centerIn: lcd
         opacity: editing ? 1 : 0
         value: root.app.masterBpm
-        decimals: 2
+        decimals: Look.bpmDecimals(root.app.masterBpm)
         fontSize: Math.round(root.digitHeight * 0.75)
         boxHeight: Math.round(root.digitHeight * 1.05)
         onSubmitted: v => root.app.masterBpm = v

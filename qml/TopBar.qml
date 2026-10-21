@@ -5,7 +5,7 @@ import HighlighterUI
 Item {
     id: root
     required property AppController app
-    signal performRequested()
+    signal modeRequested(string mode)
     implicitHeight: Theme.s(64)
 
     //! The width it needs with nothing cut.
@@ -17,9 +17,8 @@ Item {
         spacing: Theme.s(16)
 
         Text {
-            // the two decks' colours
-            text: "<font color='" + Look.deckA + "'>BEAT</font><font color='" + Look.deckB + "'>ER</font>"
-            textFormat: Text.RichText
+            text: "BEATER"
+            color: Theme.accent
             font.family: Theme.family
             font.pixelSize: Theme.s(20)
             font.weight: Font.Black
@@ -29,7 +28,7 @@ Item {
         Column {
             spacing: Theme.s(4)
             ParamText { text: "mode"; caps: true; wrapMode: Text.NoWrap }
-            ModeSwitch { perform: false; onSwitched: p => { if (p) root.performRequested() } }
+            ModeSwitch { mode: "edit"; onSwitched: m => root.modeRequested(m) }
         }
 
         Item { Layout.fillWidth: true }
@@ -61,17 +60,6 @@ Item {
                 model: ["Beat", "Bar"]
                 currentIndex: root.app.phaseMode
                 onActivated: i => root.app.phaseMode = i
-            }
-        }
-
-        Column {
-            spacing: Theme.s(4)
-            ParamText { text: "keys"; caps: true; wrapMode: Text.NoWrap }
-            ParamChoice {
-                width: Theme.s(150)
-                model: ["Names", "Camelot"]
-                currentIndex: root.app.library.camelot ? 1 : 0
-                onActivated: i => root.app.library.camelot = i === 1
             }
         }
 

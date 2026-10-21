@@ -59,7 +59,7 @@ ParamPlate {
             ParamText {
                 // key (the shifted key when shifted) and tempo, at a glance
                 text: (root.deck.keyShift !== 0 ? root.deck.shiftedKeyText : root.deck.keyText)
-                      + (root.deck.bpm > 0 ? "   " + root.deck.bpm.toFixed(1) : "")
+                      + (root.deck.bpm > 0 ? "   " + Look.fmtBpm(root.deck.bpm) : "")
                 color: Theme.textDim
                 mono: true
                 small: true
