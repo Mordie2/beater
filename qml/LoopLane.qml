@@ -57,8 +57,9 @@ Item {
         width: Math.max(Theme.s(2), lane.xAtBeat(b) - x)
         height: lane.laneHeight
         z: active || editing ? 2 : kind === "custom" ? 1 : 0
-        color: lane.tint
+        color: editing || active ? Theme.litOf(lane.tint) : lane.tint
         opacity: editing || active ? 1 : armed ? 0.55 : 0.22
+        ParamGlow { anchors.fill: parent; z: -1; color: lane.tint; strength: r.active || r.editing ? 0.7 : 0 }
         // the ends you can grab
         Rectangle { width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(r.color) }
         Rectangle { x: parent.width - width; width: Math.min(lane.handle, parent.width / 2); height: parent.height; color: Theme.edgeOf(r.color) }
@@ -90,9 +91,10 @@ Item {
         x: lane.xAtBeat(lane.deck.customStartBeat) - Theme.s(1)
         width: Math.max(Theme.s(3), lane.xAtBeat(lane.deck.beat) - x)
         height: lane.laneHeight
-        color: lane.tint
-        opacity: 0.8
+        color: Theme.litOf(lane.tint)
+        opacity: 0.9
         z: 3
+        ParamGlow { anchors.fill: parent; z: -1; color: lane.tint; strength: 0.7 }
     }
 
     // ---- name tags: solid while looping, outlined while armed, dim when off; click = on / off
@@ -107,7 +109,7 @@ Item {
         x: lane.tagX(t)
         width: label.implicitWidth + Theme.s(12)
         height: lane.tagHeight
-        color: on ? lane.tint : "transparent"
+        color: on ? Theme.litOf(lane.tint) : "transparent"
         border.width: 1
         border.color: on || armed ? lane.tint : Theme.line
         Text {

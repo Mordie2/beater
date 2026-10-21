@@ -90,7 +90,8 @@ struct CacheKey {
     const TrackBuffer *buffer = nullptr;
     int rev = -1;
     int width = 0, height = 0; // device pixels
-    QRgb color = 0;
+    QRgb color = 0, core = 0;
+    bool glow = false;
     double pixelsPerSec = 0.0; // zoom only
     bool operator==(const CacheKey &) const = default;
 };
@@ -100,9 +101,11 @@ public:
     WaveNode()
     {
         under->setFlag(OwnedByParent);
+        glows->setFlag(OwnedByParent);
         images->setFlag(OwnedByParent);
         over->setFlag(OwnedByParent);
         appendChildNode(under);
+        appendChildNode(glows);
         appendChildNode(images);
         appendChildNode(over);
     }
@@ -113,28 +116,89 @@ public:
         // the nodes using them are rebuilt this frame
         images->begin();
         images->end();
+        glows->begin();
+        glows->end();
         delete overview;
-        overview = nullptr;
-        for (const Tile &t : std::as_const(tiles))
+        delete overviewGlow;
+        overview = overviewGlow = nullptr;
+        for (const Tile &t : std::as_const(tiles)) {
             delete t.texture;
+            delete t.glow;
+        }
         tiles.clear();
     }
 
     RectLayer *under = new RectLayer;
+    ImageLayer *glows = new ImageLayer; // the halos, under the waveform
     ImageLayer *images = new ImageLayer;
     RectLayer *over = new RectLayer;
 
     CacheKey key;
-    QSGTexture *overview = nullptr;
+    QSGTexture *overview = nullptr, *overviewGlow = nullptr;
     struct Tile {
         QSGTexture *texture = nullptr;
+        QSGTexture *glow = nullptr;
         quint64 used = 0;
     };
     QHash<int, Tile> tiles;
     quint64 frame = 0;
 };
 
+using NodeTile = WaveNode::Tile;
+
 double s_renderMs = 0.0;
+
+// The halo round a drawn waveform: its shape, blurred (two box blurs each
+// way, close to a gaussian), in the glow colour. Made once per tile.
+QImage glowOf(const QImage &src, const QColor &color, int radius, double gain)
+{
+    const int w = src.width(), h = src.height();
+    std::vector<float> a(size_t(w) * h), t(a.size());
+    for (int y = 0; y < h; ++y) {
+        const QRgb *line = reinterpret_cast<const QRgb *>(src.constScanLine(y));
+        for (int x = 0; x < w; ++x)
+            a[size_t(y) * w + x] = qAlpha(line[x]) / 255.0f;
+    }
+    const int r = std::max(1, radius);
+    const float norm = 1.0f / float(2 * r + 1);
+    auto blurH = [&](const std::vector<float> &in, std::vector<float> &out) {
+        for (int y = 0; y < h; ++y) {
+            const float *row = in.data() + size_t(y) * w;
+            float *o = out.data() + size_t(y) * w;
+            float sum = 0;
+            for (int x = -r; x <= r; ++x)
+                sum += row[std::clamp(x, 0, w - 1)];
+            for (int x = 0; x < w; ++x) {
+                o[x] = sum * norm;
+                sum += row[std::min(x + r + 1, w - 1)] - row[std::max(x - r, 0)];
+            }
+        }
+    };
+    auto blurV = [&](const std::vector<float> &in, std::vector<float> &out) {
+        for (int x = 0; x < w; ++x) {
+            float sum = 0;
+            for (int y = -r; y <= r; ++y)
+                sum += in[size_t(std::clamp(y, 0, h - 1)) * w + x];
+            for (int y = 0; y < h; ++y) {
+                out[size_t(y) * w + x] = sum * norm;
+                sum += in[size_t(std::min(y + r + 1, h - 1)) * w + x] - in[size_t(std::max(y - r, 0)) * w + x];
+            }
+        }
+    };
+    blurH(a, t);
+    blurV(t, a);
+    blurH(a, t);
+    blurV(t, a);
+    QImage out(w, h, QImage::Format_ARGB32_Premultiplied);
+    for (int y = 0; y < h; ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(out.scanLine(y));
+        for (int x = 0; x < w; ++x) {
+            const int al = int(std::min(1.0f, a[size_t(y) * w + x] * float(gain)) * 255.0f);
+            line[x] = qPremultiply(qRgba(color.red(), color.green(), color.blue(), al));
+        }
+    }
+    return out;
+}
 
 // Whole track, peak (faint) and RMS (solid) per column.
 QImage drawOverview(const TrackBuffer *tb, int w, int h, const QColor &color)
@@ -163,17 +227,18 @@ QImage drawOverview(const TrackBuffer *tb, int w, int h, const QColor &color)
 }
 
 // One stretch of the zoomed waveform, from the fine peaks: tile i starts at
-// i * kTileWidth / pixelsPerSec seconds.
-QImage drawTile(const TrackBuffer *tb, int i, int h, double pixelsPerSec, const QColor &color)
+// i * kTileWidth / pixelsPerSec seconds. pad more columns either side (for
+// a glow, so it blurs across the tiles' seams).
+QImage drawTile(const TrackBuffer *tb, int i, int h, double pixelsPerSec, const QColor &color, int pad = 0)
 {
-    QImage img(kTileWidth, h, QImage::Format_ARGB32_Premultiplied);
+    QImage img(kTileWidth + 2 * pad, h, QImage::Format_ARGB32_Premultiplied);
     img.fill(Qt::transparent);
     const QRgb px = qPremultiply(color.rgba());
     const double mid = h / 2.0;
     const double bucketsPerSec = double(tb->sampleRate) / double(TrackBuffer::kDetailFrames);
     const int n = int(tb->detail.size());
-    const double t0 = double(i) * kTileWidth / pixelsPerSec;
-    for (int c = 0; c < kTileWidth; ++c) {
+    const double t0 = (double(i) * kTileWidth - pad) / pixelsPerSec;
+    for (int c = 0; c < img.width(); ++c) {
         const double ta = t0 + c / pixelsPerSec, tb2 = t0 + (c + 1) / pixelsPerSec;
         const int b0 = int(std::floor(ta * bucketsPerSec)), b1 = std::max(b0 + 1, int(std::ceil(tb2 * bucketsPerSec)));
         float pk = 0;
@@ -279,6 +344,7 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
     const TrackBuffer *tb = m_deck ? m_deck->buffer() : nullptr;
 
     node->under->begin();
+    node->glows->begin();
     node->images->begin();
     node->over->begin();
 
@@ -288,12 +354,18 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         node->over->add(QRectF(0, std::floor(h / 2), w, 1), QColor(255, 255, 255, 30));
     } else if (!m_zoom) {
         // ---------------------------------------------------------- overview
-        const CacheKey key{tb, m_trackRev, wpx, hpx, m_color.rgba(), 0.0};
+        const QColor core = m_glow && m_coreColor.isValid() ? m_coreColor : m_color;
+        const CacheKey key{tb, m_trackRev, wpx, hpx, m_color.rgba(), core.rgba(), m_glow, 0.0};
         if (!(key == node->key) || !node->overview) {
             node->dropTextures();
             node->key = key;
-            node->overview = window()->createTextureFromImage(drawOverview(tb, wpx, hpx, m_color));
+            const QImage img = drawOverview(tb, wpx, hpx, core);
+            node->overview = window()->createTextureFromImage(img);
+            if (m_glow)
+                node->overviewGlow = window()->createTextureFromImage(glowOf(img, m_color, int(3 * dpr), 1.4));
         }
+        if (node->overviewGlow)
+            node->glows->add(node->overviewGlow, QRectF(0, 0, w, h));
         node->images->add(node->overview, QRectF(0, 0, w, h));
 
         const double dur = std::max(0.001, m_deck->duration());
@@ -370,7 +442,8 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
         const double pixelsPerSec = wpx / span;
         auto xAt = [&](double sec) { return (sec - t0) / span * w; };
 
-        const CacheKey key{tb, m_trackRev, wpx, hpx, m_color.rgba(), pixelsPerSec};
+        const QColor core = m_glow && m_coreColor.isValid() ? m_coreColor : m_color;
+        const CacheKey key{tb, m_trackRev, wpx, hpx, m_color.rgba(), core.rgba(), m_glow, pixelsPerSec};
         if (!(key == node->key)) {
             node->dropTextures();
             node->key = key;
@@ -413,12 +486,26 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
                         if (t->used < oldest->used)
                             oldest = t;
                     delete oldest->texture;
+                    delete oldest->glow;
                     node->tiles.erase(oldest);
                 }
-                it = node->tiles.insert(i, {window()->createTextureFromImage(drawTile(tb, i, hpx, pixelsPerSec, m_color)), 0});
+                NodeTile t;
+                if (m_glow) {
+                    // drawn wider than the tile, so the blur sees across the seams
+                    const int radius = int(5 * dpr), pad = 4 * radius;
+                    const QImage wide = drawTile(tb, i, hpx, pixelsPerSec, core, pad);
+                    t.texture = window()->createTextureFromImage(wide.copy(pad, 0, kTileWidth, hpx));
+                    t.glow = window()->createTextureFromImage(glowOf(wide, m_color, radius, 1.6).copy(pad, 0, kTileWidth, hpx));
+                } else {
+                    t.texture = window()->createTextureFromImage(drawTile(tb, i, hpx, pixelsPerSec, core));
+                }
+                it = node->tiles.insert(i, t);
             }
             it->used = node->frame;
-            node->images->add(it->texture, QRectF(xAt(i * tileSec), 0, tileSec / span * w, h));
+            const QRectF at(xAt(i * tileSec), 0, tileSec / span * w, h);
+            if (it->glow)
+                node->glows->add(it->glow, at);
+            node->images->add(it->texture, at);
         }
 
         // what has played, darker
@@ -447,6 +534,7 @@ QSGNode *WaveformItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
     }
 
     node->under->end();
+    node->glows->end();
     node->images->end();
     node->over->end();
     s_renderMs += timer.nsecsElapsed() / 1e6;

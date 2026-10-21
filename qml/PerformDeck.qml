@@ -37,7 +37,8 @@ ParamPlate {
             Rectangle {
                 implicitWidth: Theme.s(18)
                 implicitHeight: Theme.s(18)
-                color: root.accent
+                color: Theme.litOf(root.accent)
+                ParamGlow { anchors.fill: parent; z: -1; color: root.accent }
                 Text {
                     anchors.centerIn: parent
                     text: root.deck.name
@@ -81,6 +82,8 @@ ParamPlate {
                 deck: root.deck
                 color: root.accent
                 gridColor: Look.grid
+                glow: Theme.hardware
+                coreColor: Theme.litOf(root.accent)
                 loopColor: Look.neutral
             }
             // the deck's level along the bottom edge (under the loop lane)

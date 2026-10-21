@@ -82,7 +82,8 @@ Panel {
             Rectangle {
                 implicitWidth: Theme.s(22)
                 implicitHeight: Theme.s(22)
-                color: root.accent
+                color: Theme.litOf(root.accent)
+                ParamGlow { anchors.fill: parent; z: -1; color: root.accent }
                 Text {
                     anchors.centerIn: parent
                     text: root.deck.name
@@ -122,6 +123,8 @@ Panel {
                 zoomBeats: 16
                 color: root.accent
                 gridColor: Look.grid
+                glow: Theme.hardware
+                coreColor: Theme.litOf(root.accent)
                 loopColor: Look.neutral
                 gridEdit: root.gridEdit
             }
@@ -149,6 +152,8 @@ Panel {
                     deck: root.deck
                     color: root.accent
                     gridColor: Look.grid
+                    glow: Theme.hardware
+                    coreColor: Theme.litOf(root.accent)
                     loopColor: Look.neutral
                 }
             }

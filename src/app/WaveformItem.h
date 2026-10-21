@@ -29,6 +29,10 @@ class WaveformItem : public QQuickItem {
     Q_PROPERTY(QColor gridColor MEMBER m_gridColor NOTIFY colorChanged)  // beat / phrase lines
     Q_PROPERTY(QColor loopColor MEMBER m_loopColor NOTIFY colorChanged)  // loop regions
     Q_PROPERTY(bool gridEdit MEMBER m_gridEdit NOTIFY gridEditChanged)
+    // Glow (the hardware look): the waveform drawn in coreColor, almost white,
+    // with a soft halo in color round it, like a neon tube.
+    Q_PROPERTY(bool glow MEMBER m_glow NOTIFY colorChanged)
+    Q_PROPERTY(QColor coreColor MEMBER m_coreColor NOTIFY colorChanged)
 
 public:
     explicit WaveformItem(QQuickItem *parent = nullptr);
@@ -69,6 +73,8 @@ private:
     QColor m_gridColor = QColor(255, 255, 255);
     QColor m_loopColor = QColor(255, 255, 255);
     bool m_gridEdit = false;
+    bool m_glow = false;
+    QColor m_coreColor;
     double m_gridShift = 0.0; // s, while the grid is being dragged
     int m_trackRev = 0; // bumped when the track changes, so cached textures go
 
