@@ -93,6 +93,7 @@ Panel {
             Crossfader {
                 app: root.app
                 key: "mix.crossfader"
+                implicitWidth: Theme.s(52) // narrow from the start: its height follows its width
                 Layout.preferredWidth: Theme.s(52)
                 Layout.alignment: Qt.AlignTop
                 aspect: Theme.s(52) / Math.max(Theme.s(80), faders.implicitHeight)

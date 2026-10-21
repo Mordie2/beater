@@ -49,7 +49,7 @@ Item {
         Column {
             spacing: Theme.s(4)
             ParamText { text: "bar"; caps: true; wrapMode: Text.NoWrap }
-            BeatLights { app: root.app }
+            BeatLights { beat: root.app.masterBeat }
         }
 
         Column {

@@ -34,7 +34,7 @@ Item {
             RowLayout {
                 spacing: root.gap
                 BeatLights {
-                    app: root.app
+                    beat: root.app.masterBeat
                     size: Theme.s(10)
                     spacing: Theme.s(3)
                     Layout.alignment: Qt.AlignVCenter
@@ -79,6 +79,7 @@ Item {
         Crossfader {
             app: root.app
             key: "strip.crossfader"
+            implicitWidth: Theme.s(48) // narrow from the start: its height follows its width
             Layout.preferredWidth: Theme.s(48)
             Layout.alignment: Qt.AlignTop
             aspect: Theme.s(48) / Math.max(Theme.s(80), deckA.implicitHeight)

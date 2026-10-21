@@ -103,6 +103,13 @@ Panel {
                 wrapMode: Text.NoWrap
                 elide: Text.ElideRight
             }
+            DeckBeat {
+                deck: root.deck
+                app: root.app
+                size: Theme.s(14)
+                spacing: Theme.s(3)
+                Layout.alignment: Qt.AlignVCenter
+            }
             DeckClock {
                 visible: root.deck.loaded
                 deck: root.deck

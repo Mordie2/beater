@@ -52,6 +52,9 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
 - **Grid edit** (the pencil): the row becomes BPM, ×2 / ÷2, Tap, =M, grid nudge, Set 1,
   Auto, and key. Drag the big waveform to slide the grid under the music; double-click a beat
   to make it the 1. Done (or the pencil again) goes back.
+- **Beat squares** per deck (Edit and Perform): four squares walk 1-2-3-4 through the bar,
+  the 1 brightest. A playing deck shows its own beats; a stopped one shows the master's,
+  dimmed, which it locks to when you press play, so you can start it on the 1.
 - **Play / Pause**: two buttons, the state you're in solid. PLAY while paused plays from
   there; PLAY again while playing starts the track over from its first bar line. Jumps keep
   a synced deck in phase: it lands at the same place in the beat (in the bar, with bar phase
