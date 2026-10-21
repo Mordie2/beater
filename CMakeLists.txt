@@ -8,6 +8,13 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
+# Windows (MSVC): M_PI from <cmath>, no min / max macros from <windows.h>,
+# UTF-8 sources, and Rubber Band's one big translation unit needs /bigobj.
+if(MSVC)
+    add_compile_definitions(_USE_MATH_DEFINES NOMINMAX)
+    add_compile_options(/utf-8)
+endif()
+
 include(FetchContent)
 
 # ---------------------------------------------------------------------------
@@ -37,13 +44,19 @@ if(APPLE)
     target_link_libraries(miniaudio PUBLIC "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
 else()
     find_package(Threads REQUIRED)
-    target_link_libraries(miniaudio PUBLIC Threads::Threads ${CMAKE_DL_LIBS} m)
+    target_link_libraries(miniaudio PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+    if(UNIX)
+        target_link_libraries(miniaudio PUBLIC m)
+    endif()
 endif()
 
 add_library(rubberband STATIC ${rubberband_SOURCE_DIR}/single/RubberBandSingle.cpp)
 target_include_directories(rubberband SYSTEM PUBLIC ${rubberband_SOURCE_DIR})
 if(APPLE)
     target_link_libraries(rubberband PUBLIC "-framework Accelerate")
+endif()
+if(MSVC)
+    target_compile_options(rubberband PRIVATE /bigobj)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -133,6 +146,7 @@ qt_add_qml_module(beater
 )
 
 set_target_properties(beater PROPERTIES
+    WIN32_EXECUTABLE TRUE   # a window, no console, on Windows
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_GUI_IDENTIFIER nl.blocksystem.beater
     MACOSX_BUNDLE_BUNDLE_NAME beater

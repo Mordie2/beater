@@ -62,7 +62,8 @@ static void installDebugHooks(QQmlApplicationEngine &engine, AppController &cont
     }
     const QString snapshot = qEnvironmentVariable("BEATER_SNAPSHOT");
     if (!snapshot.isEmpty()) {
-        QTimer::singleShot(qEnvironmentVariableIntValue("BEATER_SNAPSHOT_MS") ?: 6000, &engine, [&engine, snapshot] {
+        const int snapshotMs = qEnvironmentVariableIntValue("BEATER_SNAPSHOT_MS");
+        QTimer::singleShot(snapshotMs > 0 ? snapshotMs : 6000, &engine, [&engine, snapshot] {
             if (auto *w = engine.rootObjects().isEmpty() ? nullptr
                                                         : qobject_cast<QQuickWindow *>(engine.rootObjects().first()))
                 w->grabWindow().save(snapshot);

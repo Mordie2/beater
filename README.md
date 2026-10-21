@@ -15,6 +15,36 @@ open build/beater.app
 
 The first configure clones miniaudio and Rubber Band from GitHub (FetchContent), so it needs internet once.
 
+### Windows
+
+Not built or tested on Windows yet; the CMake setup is written for it (MSVC).
+
+1. Install [Git](https://git-scm.com/download/win), and Visual Studio 2022 (the free
+   Community edition or the Build Tools) with the **Desktop development with C++** workload.
+2. Install Qt with the [Qt Online Installer](https://www.qt.io/download-qt-installer):
+   **Qt 6.11.2 → MSVC 2022 64-bit**, and under Developer and Designer Tools **CMake**,
+   **Ninja** and **Qt Creator**. (Qt 6.9 or newer is needed for the glow.)
+3. Clone with the UI kit (a submodule):
+   `git clone --recurse-submodules https://github.com/chrisssstos/beater.git`
+4. Easiest: open `CMakeLists.txt` in Qt Creator, pick the *Desktop Qt 6.11.2 MSVC2022 64bit*
+   kit, and press Run. It downloads miniaudio and Rubber Band on the first configure.
+
+   Or in an *x64 Native Tools Command Prompt for VS 2022*:
+   ```bat
+   cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=C:\Qt\6.11.2\msvc2022_64
+   cmake --build build
+   C:\Qt\6.11.2\msvc2022_64\bin\windeployqt.exe --qmldir qml build\beater.exe
+   build\beater.exe
+   ```
+   (`windeployqt` copies the Qt DLLs and QML modules next to the exe, so it runs outside
+   Qt Creator.)
+
+On Windows the files are decoded by miniaudio: MP3, WAV and FLAC work, M4A / AAC and AIFF
+don't (on macOS Core Audio decodes those). The library, settings and audio output work the
+same; the library lives in `%APPDATA%\BLOCK SYSTEM\beater\library.json`.
+
+### macOS notes
+
 If `cmake` / `ninja` aren't on your PATH, use the ones Qt ships:
 `export PATH=~/Qt/Tools/CMake/CMake.app/Contents/bin:~/Qt/Tools/Ninja:$PATH`.
 
