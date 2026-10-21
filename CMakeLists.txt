@@ -101,9 +101,10 @@ set(BEATER_QML
     qml/MixView.qml
     qml/PerformView.qml
     qml/PerformDeck.qml
-    qml/Playlist.qml
+    qml/LibraryPanel.qml
     qml/DeckDrop.qml
     qml/LoopLane.qml
+    qml/Crossfader.qml
 )
 # Put the QML files at the module root so they see the module's C++ types.
 foreach(f IN LISTS BEATER_QML)

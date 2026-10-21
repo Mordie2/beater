@@ -45,6 +45,10 @@ ApplicationWindow {
         height = p ? prefs.performHeight : prefs.editHeight
     }
 
+    // A window from before the minimum grew (a remembered size, a new control) grows with it.
+    onMinimumWidthChanged: if (width < minimumWidth) width = minimumWidth
+    onMinimumHeightChanged: if (height < minimumHeight) height = minimumHeight
+
     Component.onCompleted: {
         Theme.accent = Look.neutral   // the app's own controls; colour means a kind of control (Look)
         Theme.slidersStartMinimised = false   // volume faders want the full bar

@@ -16,7 +16,7 @@ DeckController::DeckController(int index, AudioEngine *engine, Library *library,
     , m_engine(engine)
     , m_library(library)
 {
-    m_engine->deck(m_index).volume.store(float(m_volume * m_volume));
+    applyGain();
     m_tapClock.start();
     connect(m_library, &Library::camelotChanged, this, &DeckController::keyChanged);
 }
@@ -721,6 +721,20 @@ void DeckController::setVolume(double v)
     if (v == m_volume)
         return;
     m_volume = v;
-    m_engine->deck(m_index).volume.store(float(v * v)); // simple fader taper
+    applyGain();
     emit volumeChanged();
+}
+
+void DeckController::setCrossfadeGain(double g)
+{
+    g = std::clamp(g, 0.0, 1.0);
+    if (g == m_xfadeGain)
+        return;
+    m_xfadeGain = g;
+    applyGain();
+}
+
+void DeckController::applyGain()
+{
+    m_engine->deck(m_index).volume.store(float(m_volume * m_volume * m_xfadeGain)); // squared: a fader taper
 }

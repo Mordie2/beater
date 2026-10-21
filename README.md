@@ -44,7 +44,8 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
   the window can't be made smaller than what's left needs, in either mode.
 - **A deck (Edit)**: the track, the big waveform, the timeline with the loop lane and its
   tags, then one row: Play, Sync, In / Out / Loop, the loop length, the track's BPM (and
-  the BPM it plays at), ×2 / ÷2, key, key shift, and the pencil. Beneath it is space kept
+  the BPM it plays at), ×2 / ÷2, key, key shift (and the key it plays in when shifted), and
+  the pencil. Beneath it is space kept
   for effects.
 - **Grid edit** (the pencil): the row becomes BPM, ×2 / ÷2, Tap, =M, grid nudge, Set 1,
   Auto, and key. Drag the big waveform to slide the grid under the music; double-click a beat
@@ -57,8 +58,18 @@ that mode, `BEATER_FPS=1` logs frames per second and the time spent building wav
   the playhead follows; the deck jumps there when you let go, on the beat, or in phase with
   the master when it's synced and playing. The big waveform can be grabbed and dragged the
   same way.
-- **Loading**: drag a track from the playlist onto a deck (in either mode), double-click it,
-  or press A / B. Over a playing deck the drop target turns red: it replaces that track.
+- **Loading**: drag a track from the library onto a deck (in either mode), double-click it,
+  or press A / B. Or drop files straight from the Finder onto a deck: they go into the library
+  and the first one loads. Over a playing deck the drop target turns red: it replaces that
+  track.
+- **Library**: every track you've added, and your saved playlists (the dropdown at the top).
+  NEW makes a playlist (type its name in the field); ✕ then "Delete?" removes one. With a
+  playlist open, files you drop or add go into it too, and ⌫ takes one out; in All tracks, +
+  puts a track in the playlist you opened last, and ⌫ removes it from the library. It all
+  lives in library.json, the open view too.
+- **Crossfader**: the XY pad in the mix (and in Perform). Left is A, right is B; in the middle
+  both play at their faders, and towards one side the other fades out. Only x counts for now
+  (y is kept for four decks). Double-click recentres it.
 - **Loops**: every track has three, and the deck loops one at a time:
   - **Intro**: its first N bars (8 by default). A loaded track starts with INTRO armed, so
     play loops the intro until you release it.

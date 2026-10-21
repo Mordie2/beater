@@ -97,7 +97,7 @@ Panel {
                 text: root.deck.loading ? "loading…"
                     : root.deck.error.length ? root.deck.error
                     : root.deck.loaded ? root.deck.title
-                    : "empty: drag a track here, double-click one, or press " + root.deck.name + " in the playlist"
+                    : "empty: drag a track here, double-click one, or press " + root.deck.name + " in the library"
                 color: root.deck.error.length ? Look.warn : root.deck.loaded ? Theme.text : Theme.textFaint
                 wrapMode: Text.NoWrap
                 elide: Text.ElideRight
@@ -123,7 +123,7 @@ Panel {
                 zoom: true
                 zoomBeats: 16
                 color: root.accent
-                gridColor: Look.tempo
+                gridColor: Look.grid
                 loopColor: Look.loop
                 gridEdit: root.gridEdit
             }
@@ -150,7 +150,7 @@ Panel {
                     anchors.fill: parent
                     deck: root.deck
                     color: root.accent
-                    gridColor: Look.tempo
+                    gridColor: Look.grid
                     loopColor: Look.loop
                 }
             }
@@ -301,6 +301,16 @@ Panel {
                     }
                     Btn { text: "+"; implicitWidth: Theme.s(26); enabled: root.deck.keyShift < 12; onClicked: root.deck.keyShift = root.deck.keyShift + 1 }
                     Btn { id: shiftReset; Layout.maximumWidth: root.dropped(shiftReset) ? 0 : Number.POSITIVE_INFINITY; opacity: root.dropped(shiftReset) ? 0 : (enabled ? 1 : 0.4); text: "0"; implicitWidth: Theme.s(26); enabled: root.deck.keyShift !== 0; onClicked: root.deck.keyShift = 0 }
+                    ParamText {
+                        // the key it plays in now, when shifted; as wide as the widest key name
+                        id: shiftedKey
+                        text: root.deck.keyShift !== 0 && root.deck.key >= 0 ? "→ " + root.deck.shiftedKeyText : ""
+                        color: Look.key
+                        mono: true
+                        wrapMode: Text.NoWrap
+                        Layout.preferredWidth: widestKey.width
+                        TextMetrics { id: widestKey; font: shiftedKey.font; text: "→ 12A·" }
+                    }
                 }
                 Item { Layout.fillWidth: true }
                 RowLayout {

@@ -12,6 +12,7 @@ AppController::AppController(QObject *parent)
     m_masterBpm = s.value("masterBpm", 125.0).toDouble();
     m_masterVolume = s.value("masterVolume", 0.85).toDouble();
     m_phaseMode = s.value("phaseMode", 0).toInt();
+    m_crossfader = std::clamp(s.value("crossfader", 0.0).toDouble(), -1.0, 1.0);
 
     m_output = s.value("outputDevice").toString();
     openOutput();
@@ -25,6 +26,7 @@ AppController::AppController(QObject *parent)
     m_library = std::make_unique<Library>();
     for (int i = 0; i < 2; ++i)
         m_decks[i] = std::make_unique<DeckController>(i, m_engine.get(), m_library.get());
+    applyCrossfader(); // the remembered position
     connect(m_library.get(), &Library::recordChanged, this, [this](const QString &id) {
         for (auto &d : m_decks)
             d->refreshFromLibrary(id);
@@ -43,6 +45,7 @@ AppController::~AppController()
     s.setValue("masterBpm", m_masterBpm);
     s.setValue("masterVolume", m_masterVolume);
     s.setValue("phaseMode", m_phaseMode);
+    s.setValue("crossfader", m_crossfader);
     m_engine->stop();
 }
 
@@ -157,6 +160,26 @@ void AppController::setMasterVolume(double v)
     emit masterVolumeChanged();
 }
 
+// The crossfader on top of the faders: in the middle both decks play at their
+// fader; towards one side the other deck fades out (a quarter cosine), gone at
+// the end.
+void AppController::setCrossfader(double x)
+{
+    x = std::clamp(std::round(x * 100.0) / 100.0, -1.0, 1.0);
+    if (x == m_crossfader)
+        return;
+    m_crossfader = x;
+    applyCrossfader();
+    emit crossfaderChanged();
+}
+
+void AppController::applyCrossfader()
+{
+    const double x = m_crossfader;
+    m_decks[0]->setCrossfadeGain(x <= 0.0 ? 1.0 : std::cos(x * M_PI / 2.0));
+    m_decks[1]->setCrossfadeGain(x >= 0.0 ? 1.0 : std::cos(-x * M_PI / 2.0));
+}
+
 void AppController::setPhaseMode(int m)
 {
     m = m ? 1 : 0;
@@ -190,6 +213,15 @@ void AppController::loadToFreeDeck(int row)
     else
         target = m_decks[0]->volume() <= m_decks[1]->volume() ? 0 : 1;
     loadToDeck(row, target);
+}
+
+void AppController::loadUrlsToDeck(const QList<QUrl> &urls, int deck)
+{
+    if (deck < 0 || deck > 1)
+        return;
+    const QStringList ids = m_library->addUrls(urls);
+    if (!ids.isEmpty())
+        m_decks[deck]->loadRecord(m_library->record(ids.first()));
 }
 
 void AppController::matchMasterTo(int deck)

@@ -54,7 +54,7 @@ Library::Library(QObject *parent)
     connect(&m_saveTimer, &QTimer::timeout, this, &Library::save);
     m_camelot = QSettings().value("camelot", false).toBool();
     load();
-    for (const QString &id : std::as_const(m_playlist))
+    for (const QString &id : std::as_const(m_all))
         if (m_tracks[id].needsAnalysis())
             analyze(id);
 }
@@ -73,8 +73,8 @@ void Library::setCamelot(bool on)
         return;
     m_camelot = on;
     QSettings().setValue("camelot", on);
-    if (!m_playlist.isEmpty())
-        emit dataChanged(index(0), index(int(m_playlist.size()) - 1), {KeyTextRole});
+    if (!shown().isEmpty())
+        emit dataChanged(index(0), index(int(shown().size()) - 1), {KeyTextRole});
     emit camelotChanged();
 }
 
@@ -90,14 +90,14 @@ QStringList Library::audioExtensions()
 
 int Library::rowCount(const QModelIndex &parent) const
 {
-    return parent.isValid() ? 0 : int(m_playlist.size());
+    return parent.isValid() ? 0 : int(shown().size());
 }
 
 QVariant Library::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || index.row() >= m_playlist.size())
+    if (!index.isValid() || index.row() >= shown().size())
         return {};
-    const TrackRecord &r = m_tracks[m_playlist[index.row()]];
+    const TrackRecord &r = m_tracks[shown()[index.row()]];
     switch (role) {
     case IdRole: return r.id;
     case TitleRole: return r.title;
@@ -127,9 +127,15 @@ QHash<int, QByteArray> Library::roleNames() const
     };
 }
 
-void Library::addUrls(const QList<QUrl> &urls)
+QStringList Library::addUrls(const QList<QUrl> &urls)
 {
+    QStringList ids;
     const QStringList exts = audioExtensions();
+    auto add = [&](const QString &f) {
+        const QString id = addFile(f);
+        if (!id.isEmpty() && !ids.contains(id))
+            ids << id;
+    };
     for (const QUrl &u : urls) {
         const QString p = u.isLocalFile() ? u.toLocalFile() : u.toString();
         QFileInfo fi(p);
@@ -143,51 +149,142 @@ void Library::addUrls(const QList<QUrl> &urls)
             }
             files.sort(Qt::CaseInsensitive);
             for (const QString &f : files)
-                addFile(f);
+                add(f);
         } else if (exts.contains(fi.suffix().toLower())) {
-            addFile(fi.absoluteFilePath());
+            add(fi.absoluteFilePath());
         }
     }
+    return ids;
 }
 
-void Library::addFile(const QString &path)
+// Into the library (if new) and the playlist in view (if one is).
+QString Library::addFile(const QString &path)
 {
     const QString id = contentId(path);
-    if (id.isEmpty() || m_playlist.contains(id))
-        return;
+    if (id.isEmpty())
+        return {};
     TrackRecord &r = m_tracks[id];
     if (r.id.isEmpty()) {
         r.id = id;
         r.title = QFileInfo(path).completeBaseName();
     }
     r.path = path; // follows renames/moves
-    beginInsertRows({}, int(m_playlist.size()), int(m_playlist.size()));
-    m_playlist.append(id);
-    endInsertRows();
+    auto append = [&](QList<QString> &list, bool visible) {
+        if (list.contains(id))
+            return;
+        if (visible)
+            beginInsertRows({}, int(list.size()), int(list.size()));
+        list.append(id);
+        if (visible)
+            endInsertRows();
+    };
+    append(m_all, m_view < 0);
+    if (m_view >= 0)
+        append(m_lists[m_view].ids, true);
     emit countChanged();
     if (r.needsAnalysis())
         analyze(id);
     scheduleSave();
+    return id;
 }
 
 void Library::removeAt(int row)
 {
-    if (row < 0 || row >= m_playlist.size())
+    if (row < 0 || row >= shown().size())
         return;
+    const QString id = shown()[row];
     beginRemoveRows({}, row, row);
-    m_playlist.removeAt(row);
+    shown().removeAt(row);
     endRemoveRows();
+    // out of the library: out of its playlists too
+    if (m_view < 0)
+        for (Playlist &pl : m_lists)
+            pl.ids.removeAll(id);
     emit countChanged();
     scheduleSave();
 }
 
 void Library::move(int from, int to)
 {
-    if (from == to || from < 0 || to < 0 || from >= m_playlist.size() || to >= m_playlist.size())
+    QList<QString> &list = shown();
+    if (from == to || from < 0 || to < 0 || from >= list.size() || to >= list.size())
         return;
     beginMoveRows({}, from, from, {}, to > from ? to + 1 : to);
-    m_playlist.move(from, to);
+    list.move(from, to);
     endMoveRows();
+    scheduleSave();
+}
+
+void Library::setView(int v)
+{
+    if (v < -1 || v >= m_lists.size())
+        v = -1;
+    if (v == m_view)
+        return;
+    beginResetModel();
+    m_view = v;
+    endResetModel();
+    if (v >= 0)
+        m_target = v;
+    emit viewChanged();
+    emit countChanged();
+    scheduleSave();
+}
+
+QStringList Library::playlistNames() const
+{
+    QStringList l;
+    for (const Playlist &pl : m_lists)
+        l << pl.name;
+    return l;
+}
+
+int Library::newPlaylist(const QString &name)
+{
+    m_lists.append({name.trimmed().isEmpty() ? QStringLiteral("Playlist %1").arg(m_lists.size() + 1) : name.trimmed(), {}});
+    emit playlistsChanged();
+    setView(int(m_lists.size()) - 1);
+    scheduleSave();
+    return m_view;
+}
+
+void Library::renamePlaylist(int i, const QString &name)
+{
+    if (i < 0 || i >= m_lists.size() || name.trimmed().isEmpty() || m_lists[i].name == name.trimmed())
+        return;
+    m_lists[i].name = name.trimmed();
+    emit playlistsChanged();
+    scheduleSave();
+}
+
+void Library::deletePlaylist(int i)
+{
+    if (i < 0 || i >= m_lists.size())
+        return;
+    if (m_view == i)
+        setView(-1);
+    m_lists.removeAt(i);
+    if (m_view > i)
+        --m_view;
+    m_target = m_target == i ? -1 : m_target > i ? m_target - 1 : m_target;
+    emit playlistsChanged();
+    emit viewChanged();
+    scheduleSave();
+}
+
+void Library::addToPlaylist(int row, int playlist)
+{
+    const QString id = idAt(row);
+    if (id.isEmpty() || playlist < 0 || playlist >= m_lists.size() || m_lists[playlist].ids.contains(id))
+        return;
+    const bool visible = playlist == m_view;
+    QList<QString> &ids = m_lists[playlist].ids;
+    if (visible)
+        beginInsertRows({}, int(ids.size()), int(ids.size()));
+    ids.append(id);
+    if (visible)
+        endInsertRows();
+    emit countChanged();
     scheduleSave();
 }
 
@@ -214,12 +311,12 @@ void Library::autoDetect(const QString &id, bool grid, bool key)
 
 QString Library::idAt(int row) const
 {
-    return row >= 0 && row < m_playlist.size() ? m_playlist[row] : QString();
+    return row >= 0 && row < shown().size() ? shown()[row] : QString();
 }
 
 int Library::rowOf(const QString &id) const
 {
-    return int(m_playlist.indexOf(id));
+    return int(shown().indexOf(id));
 }
 
 void Library::update(const TrackRecord &rec)
@@ -305,11 +402,23 @@ void Library::load()
     const QJsonObject tracks = root["tracks"].toObject();
     for (auto it = tracks.begin(); it != tracks.end(); ++it)
         m_tracks.insert(it.key(), TrackRecord::fromJson(it.key(), it.value().toObject()));
-    for (const QJsonValue &v : root["playlist"].toArray()) {
+    for (const QJsonValue &v : root["playlist"].toArray()) { // the library ("playlist" before playlists)
         const QString id = v.toString();
-        if (m_tracks.contains(id) && !m_playlist.contains(id))
-            m_playlist.append(id);
+        if (m_tracks.contains(id) && !m_all.contains(id))
+            m_all.append(id);
     }
+    for (const QJsonValue &v : root["playlists"].toArray()) {
+        const QJsonObject o = v.toObject();
+        Playlist pl{o["name"].toString(), {}};
+        for (const QJsonValue &t : o["tracks"].toArray())
+            if (m_tracks.contains(t.toString()) && !pl.ids.contains(t.toString()))
+                pl.ids.append(t.toString());
+        m_lists.append(pl);
+    }
+    const int v = root["view"].toInt(-1);
+    m_view = v >= 0 && v < m_lists.size() ? v : -1;
+    const int t = root["target"].toInt(-1);
+    m_target = t >= 0 && t < m_lists.size() ? t : -1;
 }
 
 void Library::scheduleSave()
@@ -323,12 +432,22 @@ void Library::save()
     for (auto it = m_tracks.cbegin(); it != m_tracks.cend(); ++it)
         tracks.insert(it.key(), it.value().toJson());
     QJsonArray playlist;
-    for (const QString &id : std::as_const(m_playlist))
+    for (const QString &id : std::as_const(m_all))
         playlist.append(id);
+    QJsonArray playlists;
+    for (const Playlist &pl : std::as_const(m_lists)) {
+        QJsonArray ids;
+        for (const QString &id : pl.ids)
+            ids.append(id);
+        playlists.append(QJsonObject{{"name", pl.name}, {"tracks", ids}});
+    }
     QJsonObject root;
-    root["version"] = 1;
+    root["version"] = 2;
     root["tracks"] = tracks;
-    root["playlist"] = playlist;
+    root["playlist"] = playlist; // the library, all tracks
+    root["playlists"] = playlists;
+    root["view"] = m_view;
+    root["target"] = m_target;
     QSaveFile f(storePath());
     if (f.open(QIODevice::WriteOnly)) {
         f.write(QJsonDocument(root).toJson(QJsonDocument::Indented));

@@ -57,7 +57,7 @@ ParamPlate {
                 elide: Text.ElideRight
             }
             ParamText {
-                // key (rose, the shifted key when shifted) and tempo (periwinkle), at a glance
+                // key (rose, the shifted key when shifted) and tempo (blood orange), at a glance
                 text: "<font color='" + Look.key + "'>" + (root.deck.keyShift !== 0 ? root.deck.shiftedKeyText : root.deck.keyText) + "</font>"
                       + (root.deck.bpm > 0 ? "&nbsp;&nbsp;&nbsp;<font color='" + Look.tempo + "'>" + root.deck.bpm.toFixed(1) + "</font>" : "")
                 textFormat: Text.RichText
@@ -83,7 +83,7 @@ ParamPlate {
                 anchors.fill: parent
                 deck: root.deck
                 color: root.accent
-                gridColor: Look.tempo
+                gridColor: Look.grid
                 loopColor: Look.loop
             }
             // the deck's level along the bottom edge (under the loop lane)

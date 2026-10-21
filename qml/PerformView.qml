@@ -78,7 +78,14 @@ Item {
             onMoved: v => root.app.masterVolume = v / 100
         }
 
-        Playlist {
+        Crossfader {
+            app: root.app
+            key: "perform.crossfader"
+            Layout.fillWidth: true
+            aspect: 7
+        }
+
+        LibraryPanel {
             app: root.app
             compact: true
             Layout.fillWidth: true

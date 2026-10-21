@@ -136,6 +136,7 @@ public:
 
     double volume() const { return m_volume; }
     void setVolume(double v);
+    void setCrossfadeGain(double g); // from the crossfader, times the fader
     int waveformRevision() const { return m_waveRev; }
 
     const TrackBuffer *buffer() const { return m_buffer.get(); }
@@ -244,6 +245,8 @@ private:
     double m_endStart = 0.0, m_endEnd = 0.0;
     QElapsedTimer m_loopSwitchedAt; // the auto-release waits for a jump in to land
     double m_volume = 0.8;
+    double m_xfadeGain = 1.0;
+    void applyGain();
 
     double m_preview = -1.0;     // < 0: not dragging
     QElapsedTimer m_previewHold; // after commit, until the seek lands

@@ -69,7 +69,7 @@ Item {
                     app: root.app
                     Layout.fillWidth: true
                 }
-                Playlist {
+                LibraryPanel {
                     app: root.app
                     compact: true
                     Layout.fillWidth: true

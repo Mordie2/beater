@@ -4,15 +4,17 @@ import QtQuick.Dialogs
 import QtQuick.Layouts
 import HighlighterUI
 
+// The library: every track added, or one of its saved playlists (the
+// dropdown). Drop files or folders here to add them (to the open playlist too).
 Panel {
     id: root
     required property AppController app
+    readonly property Library lib: app.library
     //! Perform mode: shorter rows, no time column, no hints.
     property bool compact: false
 
-    title: "Playlist"
-    note: root.app.library.count + " tracks" + (root.app.library.analyzingCount > 0 ? " · analyzing " + root.app.library.analyzingCount : "")
-           + (root.compact ? "" : "  ·  drop files or folders · double-click loads to the free deck · ⌫ removes")
+    title: "Library"
+    note: root.lib.count + " tracks" + (root.lib.analyzingCount > 0 ? " · analyzing " + root.lib.analyzingCount : "")
     tools: ParamButton { text: "Add…"; onClicked: dialog.open() }
 
     FileDialog {
@@ -82,6 +84,57 @@ Panel {
     ColumnLayout {
         anchors.fill: parent
         spacing: Theme.s(6)
+
+        // ---- all tracks, or a playlist ----
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Theme.s(4)
+            ParamCombo {
+                Layout.fillWidth: true
+                model: ["All tracks"].concat(root.lib.playlists)
+                currentIndex: root.lib.view + 1
+                onActivated: i => root.lib.view = i - 1
+            }
+            ParamButton {
+                text: "New"
+                onClicked: root.lib.newPlaylist("")
+            }
+            ParamButton {
+                // two clicks: ✕, then Delete? within 3 s
+                id: deleteButton
+                property bool armed: false
+                text: armed ? "Delete?" : "\u2715"
+                danger: armed
+                enabled: root.lib.view >= 0
+                onClicked: {
+                    if (armed) {
+                        armed = false
+                        root.lib.deletePlaylist(root.lib.view)
+                    } else {
+                        armed = true
+                        disarm.restart()
+                    }
+                }
+                Timer { id: disarm; interval: 3000; onTriggered: deleteButton.armed = false }
+            }
+        }
+        ParamField {
+            // the open playlist's name: type to rename
+            visible: root.lib.view >= 0
+            Layout.fillWidth: true
+            text: root.lib.view >= 0 ? root.lib.playlists[root.lib.view] : ""
+            placeholder: "playlist name"
+            onAccepted: t => root.lib.renamePlaylist(root.lib.view, t)
+        }
+        ParamText {
+            text: root.lib.view >= 0 ? "drop or add tracks to put them in this playlist · ⌫ takes one out"
+                : root.lib.target >= 0 ? "+ puts a track in \u201C" + root.lib.playlists[root.lib.target] + "\u201D"
+                : "drop files or folders here · New makes a playlist"
+            tone: "faint"
+            small: true
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
 
         // column header
         RowLayout {
@@ -204,7 +257,14 @@ Panel {
                     }
                     Row {
                         spacing: Theme.s(4)
-                        Layout.preferredWidth: Theme.s(60)
+                        Layout.preferredWidth: implicitWidth
+                        DeckButton {
+                            // into the playlist opened last (All tracks only)
+                            visible: root.lib.view < 0 && root.lib.target >= 0
+                            text: "+"
+                            accent: Look.neutral
+                            onClicked: root.lib.addToPlaylist(row.index, root.lib.target)
+                        }
                         DeckButton { text: "A"; accent: Look.deckA; onClicked: root.app.loadToDeck(row.index, 0) }
                         DeckButton { text: "B"; accent: Look.deckB; onClicked: root.app.loadToDeck(row.index, 1) }
                     }
