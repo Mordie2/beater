@@ -5,3 +5,8 @@ build-*/
 .qtcreator/
 CMakeLists.txt.user*
 .DS_Store
+aqtinstall.log
+__pycache__/
+.vs/
+
+

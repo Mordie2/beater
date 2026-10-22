@@ -116,6 +116,8 @@ Panel {
             }
         }
 
+        StemStatus { Layout.fillWidth: true; deck: root.deck }
+
         // ---- the big waveform ----
         Rectangle {
             Layout.fillWidth: true

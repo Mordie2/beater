@@ -1,5 +1,6 @@
 #pragma once
 #include "app/TrackRecord.h"
+#include "app/TranscriptPreview.h"
 #include "core/TrackBuffer.h"
 
 #include <QElapsedTimer>
@@ -22,6 +23,9 @@ class DeckController : public QObject {
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
     Q_PROPERTY(QString title READ title NOTIFY trackChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
+    Q_PROPERTY(QString stemStatus READ stemStatus NOTIFY stemChanged)
+    Q_PROPERTY(bool stemReady READ stemReady NOTIFY stemChanged)
+    Q_PROPERTY(bool stemBusy READ stemBusy NOTIFY stemChanged)
     Q_PROPERTY(double duration READ duration NOTIFY trackChanged)
 
     Q_PROPERTY(double position READ position NOTIFY positionChanged)
@@ -87,6 +91,12 @@ public:
     bool loading() const { return m_loading; }
     QString title() const { return m_rec.title; }
     QString error() const { return m_error; }
+    QString stemStatus() const;
+    bool stemReady() const;
+    bool stemBusy() const;
+    Q_INVOKABLE void openVocalFolder();
+    Q_INVOKABLE void retryVocals();
+    Q_INVOKABLE void showLyrics() { m_transcriptPreview.show(); }
     double duration() const { return m_buffer ? m_buffer->durationSec() : 0.0; }
 
     double position() const { return m_position; }
@@ -191,6 +201,7 @@ public:
     void masterTempoChanged() { updatePlayingBpm(); }
 
 signals:
+    void stemChanged();
     void trackChanged();
     void loadingChanged();
     void errorChanged();
@@ -219,6 +230,7 @@ private:
     int m_index;
     AudioEngine *m_engine;
     Library *m_library;
+    TranscriptPreview m_transcriptPreview;
 
     TrackRecord m_rec;
     TrackBufferPtr m_buffer;

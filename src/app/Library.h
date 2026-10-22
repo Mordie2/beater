@@ -1,5 +1,6 @@
 #pragma once
 #include "app/TrackRecord.h"
+#include "app/StemCache.h"
 
 #include <QAbstractListModel>
 #include <QHash>
@@ -72,6 +73,7 @@ public:
 
     bool contains(const QString &id) const { return m_tracks.contains(id); }
     TrackRecord record(const QString &id) const { return m_tracks.value(id); }
+    StemCache *stems() { return &m_stems; }
     void update(const TrackRecord &rec); // persists + notifies
 
     static QStringList audioExtensions();
@@ -96,6 +98,7 @@ private:
     int rowOf(const QString &id) const;
 
     QHash<QString, TrackRecord> m_tracks; // every track ever seen
+    StemCache m_stems;
     QList<QString> m_all; // the library, in the order added
     struct Playlist {
         QString name;

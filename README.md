@@ -17,7 +17,119 @@ The first configure clones miniaudio and Rubber Band from GitHub (FetchContent),
 
 ### Windows
 
-Not built or tested on Windows yet; the CMake setup is written for it (MSVC).
+Windows x64 builds use MSVC 2022 and Qt 6.9 or newer. A portable release can be
+built, engine-tested and packaged from PowerShell (Python 3.11 x64 is needed
+once to prepare the bundled separator):
+
+```powershell
+./scripts/setup-stems-windows.ps1
+./scripts/build-windows.ps1 -QtRoot C:\Qt\6.9.3\msvc2022_64
+```
+
+This creates `build-windows/beater-windows-x64/beater.exe` and
+`build-windows/beater-windows-x64.zip`, including the Qt and Visual C++ runtime
+DLLs. Extract the whole ZIP and run `beater.exe`; keep its supporting folders
+next to it. The script also accepts `-CMake` for a CMake executable outside PATH.
+Qt 6.9.3 is the kit used for the Windows build in this repository.
+
+### Cached vocal stems
+
+Loading a track onto either deck starts a background job: copy the original to
+the local cache, then extract vocals with Demucs `htdemucs`. The full mix keeps
+playing on the deck. Each deck shows queued / caching / separating / ready status;
+**Vocal folder** opens the saved stereo 44.1 kHz float WAV, ready to pass to a
+transcription tool. A separate test window also transcribes the vocal stem
+automatically (see below). No Resolume connection is included yet.
+
+Processing runs locally on CPU, one track at a time, using at most four compute
+threads. No tracks are uploaded. The Windows package includes Python, the model
+and dependencies, so the finished build works offline. First extraction can take
+several minutes depending on track length and CPU; later loads reuse the stem.
+The output retains the source timeline without trimming silence.
+Completed stems are checked separately from the extraction queue, so loading a
+cached track does not wait behind another deck's first-time separation.
+
+The cache lives under `%LOCALAPPDATA%\BLOCK SYSTEM\beater\stems\v1` on Windows.
+It stores original copies and vocal WAVs, so it consumes disk space and is not
+automatically evicted. Full SHA-256 hashes distinguish changed content. A cached
+original can be loaded if the source file has moved or disappeared. Closing the
+app stops separation; loading the track again retries unfinished work. Errors
+leave playback available and expose **Retry vocals**; `last-error.log` is stored
+in that track's cache folder. Completed stems are validated before reuse.
+
+For development, `BEATER_STEM_PYTHON` and `BEATER_STEM_WORKER` override the worker
+paths; `BEATER_STEM_CACHE` selects a separate cache root. Cache lifecycle checks:
+`build-tools/stem-runtime/python.exe tests/test_stem_cache.py`.
+
+### Separate vocal text test window
+
+Loading a track opens **Vocal Text Test** in a separate `beater-transcript.exe`
+process, one window per deck. It waits for vocal extraction, then transcribes the
+cached vocal WAV locally with the full multilingual **Whisper large-v3** model.
+Recognition prefers NVIDIA CUDA with float16 precision and falls back to the same
+model on CPU (int8) when the GPU is unavailable. It does not substitute the smaller
+base model. Both decks share a process lock so only one recognition job reserves
+GPU memory at a time. The window shows the model and GPU/CPU backend; a queued
+deck can still play audio. Words appear as segments complete. The original language
+is retained; this is transcription, not translation into English.
+Language detection samples speech-like portions so an instrumental intro does not
+dominate the language guess. Recognition then reads the full vocal timeline with
+speech VAD disabled: a speech detector can discard quiet or sustained singing.
+Near-silent separation residue and low-confidence text with implausible word
+durations are checked after decoding to reduce invented text over instrumental passages.
+**Language** can override an incorrect automatic guess (for these English tracks,
+choose English). Changing language reruns recognition. Previous base-model
+transcripts are regenerated once; the separated vocal WAV is reused. This can
+take longer on tracks with long instrumental passages. The window shows elapsed
+time and how far recognition has processed; playback can run ahead of preparation.
+
+**Copy text** copies the transcript; **Open files** opens the vocal cache folder.
+The `.transcript.txt` file holds the words and `.transcript.json` also contains
+segment and word timestamps for later use. Completed transcripts are reused
+when the vocal contents, model identity, pipeline version and language choice match. **Transcribe again** bypasses
+the saved result. Silence produces a “No clear speech detected” message.
+
+Loading a different track updates that deck's window and stops its previous
+recognition job. Closing a test window leaves audio playback alone; loading
+another track reopens it. Closing beater closes its test windows and workers.
+Each deck also has a **Lyrics** button to reopen or bring its window forward.
+Loading a track or pressing Lyrics restores a minimized window. Deck windows open
+at offset positions so one does not completely cover the other.
+The current word lights up in orange using its saved start/end timestamps and
+the deck's source playhead. Pausing holds the word; seeks, loops and tempo changes
+follow the new playback position. Gaps between vocals have no highlight. **Follow
+words** scrolls the active word into view and can be turned off for manual browsing.
+The separate process receives playback updates over a local connection; it clears
+the highlight if that connection stops. No text is sent to Resolume yet.
+
+For English, a separate local wav2vec2 CTC alignment pass refines confident word
+boundaries without changing the recognized text. It runs on CPU after the Whisper
+model is released. Alignment runs in its own cancellable process; a failure keeps
+the completed transcript and Whisper timestamps. Unsupported or uncertain words keep their Whisper timings;
+other languages currently use Whisper timings. No alignment model is downloaded
+during playback. These boundaries are estimates and are not guaranteed
+to be exact. Singing, backing vocals, and stem artifacts can cause timing and
+recognition mistakes.
+
+The setup script bundles recognition models and app-local CUDA 12/cuDNN 9 DLLs for
+offline use. No driver or global CUDA installation is changed. An existing stem
+runtime can be upgraded with `scripts/setup-recognition-windows.ps1`, then rebuilt
+with `scripts/build-windows.ps1`. Expect several GB of downloads and a larger ZIP.
+The setup runs `tests/test_gpu_recognition.py --runtime build-tools/stem-runtime`;
+this test requires real NVIDIA float16 inference and does not accept CPU fallback.
+The bundled CTranslate2 4.8.3 includes the Windows GPU model cleanup fix.
+Regression checks:
+`build-tools/stem-runtime/python.exe tests/test_transcript_cache.py`.
+Also run `tests/test_transcript_alignment.py` and `tests/test_transcript_lock.py`
+with that Python runtime. The lock test uses two real processes.
+The `transcript_sync_test` build target checks word boundaries, playback updates,
+pause/seek/loop behavior, stale connections and track changes. Run its executable
+beside the packaged Qt DLLs, `transcript-worker.py` and `stem-runtime` folder.
+The `stem_queue_test` target checks that completed vocals bypass ongoing separation.
+For visual smoke tests, `BEATER_TRANSCRIPT_SNAPSHOT=<path prefix>` saves each
+test window as `<prefix>-A.png` / `<prefix>-B.png` after
+`BEATER_TRANSCRIPT_SNAPSHOT_MS` (15000 by default), with a matching JSON file
+containing the playhead and highlighted word for synchronization checks.
 
 1. Install [Git](https://git-scm.com/download/win), and Visual Studio 2022 (the free
    Community edition or the Build Tools) with the **Desktop development with C++** workload.

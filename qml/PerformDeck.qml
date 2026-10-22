@@ -79,6 +79,8 @@ ParamPlate {
             }
         }
 
+        StemStatus { Layout.fillWidth: true; deck: root.deck }
+
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: Theme.s(30)

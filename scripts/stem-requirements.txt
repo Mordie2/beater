@@ -1,0 +1,5 @@
+demucs==4.0.1
+numpy==1.26.4
+soundfile==0.13.1
+faster-whisper==1.2.1
+ctranslate2==4.8.3

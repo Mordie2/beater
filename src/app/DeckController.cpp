@@ -6,6 +6,9 @@
 #include "core/Key.h"
 
 #include <QDateTime>
+#include <QDesktopServices>
+#include <QFileInfo>
+#include <QUrl>
 #include <QtConcurrent/QtConcurrent>
 
 #include <cmath>
@@ -19,6 +22,26 @@ DeckController::DeckController(int index, AudioEngine *engine, Library *library,
     applyGain();
     m_tapClock.start();
     connect(m_library, &Library::camelotChanged, this, &DeckController::keyChanged);
+    connect(m_library->stems(), &StemCache::changed, this, [this](const QString &id) {
+        if (id == m_rec.id) {
+            emit stemChanged();
+            if (!m_loading)
+                m_transcriptPreview.update(stemStatus(), m_library->stems()->vocals(id), stemBusy());
+        }
+    });
+}
+
+QString DeckController::stemStatus() const { return m_library->stems()->status(m_rec.id); }
+bool DeckController::stemReady() const { return !m_library->stems()->vocals(m_rec.id).isEmpty(); }
+bool DeckController::stemBusy() const { return m_library->stems()->busy(m_rec.id); }
+void DeckController::openVocalFolder()
+{
+    const QString path = m_library->stems()->vocals(m_rec.id);
+    if (!path.isEmpty()) QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+}
+void DeckController::retryVocals()
+{
+    if (loaded()) m_library->stems()->request(m_rec.id, m_rec.path);
 }
 
 double DeckController::beat() const
@@ -82,10 +105,11 @@ void DeckController::loadRecord(const TrackRecord &rec)
 {
     const int serial = ++m_loadSerial;
     m_loading = true;
+    m_transcriptPreview.load(name(), rec.title, serial);
     m_error.clear();
     emit loadingChanged();
     emit errorChanged();
-    const QString path = rec.path;
+    const QString path = m_library->stems()->cachedSource(rec.id, rec.path);
     const QString id = rec.id;
     const uint32_t sr = m_engine->sampleRate();
     QtConcurrent::run([path, sr]() -> std::shared_ptr<TrackBuffer> {
@@ -98,11 +122,15 @@ void DeckController::loadRecord(const TrackRecord &rec)
         emit loadingChanged();
         if (!tb) {
             m_error = QStringLiteral("Could not decode this file");
+            m_transcriptPreview.update(m_error, {}, false);
             emit errorChanged();
             return;
         }
         m_buffer = tb;
         m_rec = m_library->record(id);
+        m_library->stems()->request(id, m_rec.path);
+        m_transcriptPreview.update(stemStatus(), m_library->stems()->vocals(id), stemBusy());
+        emit stemChanged();
         if (m_rec.durationSec <= 0.0) {
             m_rec.durationSec = tb->durationSec();
             m_library->update(m_rec);
@@ -289,6 +317,8 @@ void DeckController::poll()
         m_level = level;
         emit levelChanged();
     }
+    if (m_buffer && !m_loading)
+        m_transcriptPreview.playback(pos, playing);
 }
 
 // ---------------------------------------------------------------- transport

@@ -40,6 +40,12 @@ endif()
 add_library(miniaudio STATIC ${miniaudio_SOURCE_DIR}/miniaudio.c)
 target_include_directories(miniaudio SYSTEM PUBLIC ${miniaudio_SOURCE_DIR})
 target_compile_definitions(miniaudio PUBLIC MA_NO_ENGINE MA_NO_NODE_GRAPH MA_NO_RESOURCE_MANAGER MA_NO_GENERATION)
+if(WIN32)
+    # Qt initializes the GUI thread as a COM single-threaded apartment. Match
+    # that model: miniaudio 0.11's WASAPI helper otherwise uninitializes Qt's
+    # COM apartment after a failed MTA init, breaking audio and shutdown.
+    target_compile_definitions(miniaudio PRIVATE MA_COINIT_VALUE=2)
+endif()
 if(APPLE)
     target_link_libraries(miniaudio PUBLIC "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
 else()
@@ -90,7 +96,7 @@ endif()
 # ---------------------------------------------------------------------------
 option(BEATER_CORE_ONLY "Only build the audio core and tests (no Qt)" OFF)
 if(NOT BEATER_CORE_ONLY)
-find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2 Concurrent)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Quick QuickControls2 Concurrent Network)
 qt_standard_project_setup(REQUIRES 6.5)
 
 # UI kit (git submodule: git submodule update --init)
@@ -121,6 +127,7 @@ set(BEATER_QML
     qml/DeckClock.qml
     qml/PerformStrip.qml
     qml/DeckBeat.qml
+    qml/StemStatus.qml
 )
 # Put the QML files at the module root so they see the module's C++ types.
 foreach(f IN LISTS BEATER_QML)
@@ -135,6 +142,10 @@ qt_add_qml_module(beater
     QML_FILES ${BEATER_QML}
     SOURCES
         src/app/TrackRecord.h
+        src/app/StemCache.h
+        src/app/StemCache.cpp
+        src/app/TranscriptPreview.h
+        src/app/TranscriptPreview.cpp
         src/app/Library.h
         src/app/Library.cpp
         src/app/DeckController.h
@@ -154,7 +165,22 @@ set_target_properties(beater PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
 )
 
-target_link_libraries(beater PRIVATE beater_core HighlighterUIplugin Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent)
+target_link_libraries(beater PRIVATE beater_core HighlighterUIplugin Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Network)
+
+# Independent test display: its own process, window, and transcription worker.
+qt_add_executable(beater-transcript
+    src/transcript/main.cpp
+    src/transcript/TranscriptController.h
+    src/transcript/TranscriptController.cpp
+)
+set_source_files_properties(qml/TranscriptWindow.qml PROPERTIES QT_RESOURCE_ALIAS TranscriptWindow.qml)
+qt_add_qml_module(beater-transcript
+    URI BeaterTranscript
+    VERSION 1.0
+    QML_FILES qml/TranscriptWindow.qml
+)
+set_target_properties(beater-transcript PROPERTIES WIN32_EXECUTABLE TRUE)
+target_link_libraries(beater-transcript PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -164,4 +190,13 @@ option(BEATER_TESTS "Build headless engine tests" ON)
 if(BEATER_TESTS)
     add_executable(engine_test tests/engine_test.cpp)
     target_link_libraries(engine_test PRIVATE beater_core)
+    if(NOT BEATER_CORE_ONLY)
+        add_executable(transcript_sync_test tests/transcript_sync_test.cpp
+            src/transcript/TranscriptController.cpp src/transcript/TranscriptController.h)
+        target_include_directories(transcript_sync_test PRIVATE src)
+        target_link_libraries(transcript_sync_test PRIVATE Qt6::Gui Qt6::Network)
+        add_executable(stem_queue_test tests/stem_queue_test.cpp src/app/StemCache.cpp src/app/StemCache.h)
+        target_include_directories(stem_queue_test PRIVATE src)
+        target_link_libraries(stem_queue_test PRIVATE Qt6::Core Qt6::Concurrent)
+    endif()
 endif()
